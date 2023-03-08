@@ -32,7 +32,7 @@ __version__='3.0'
 
 
 ################################################################################
-######################### Auxiliary Functions ##################################
+########################## AUXILIARY FUNCTIONS #################################
 ################################################################################
 def wextend(sig, npad, mode = 'constant', **kwargs):
     """
@@ -292,14 +292,23 @@ def MIF_run(x, options=None, M = np.array([]),**kwargs):
 def MIF_v3(f,options,M=np.array([]),window_file=None):
    
     opts = options
-    #verbose = options.verbose
+    if opts.verbose:
+        print('running MIF decomposition...')
+        #if verbose:
+        print('****MIF settings****')
+        [print(i,options[i]) for i in options]
 
     tol = 1e-12 
 
+    #loading master filter
     if window_file is None:
         window_file = get_window_file_path()
+    try:
+        MM = loadmat(window_file)['MM'].flatten()
+    except:
+        raise ValueError("ERROR! Could not load window function from file: "+window_file)
 
-
+    #setting up machinery
     f = np.asarray(f)
     if len(f.shape) != 2: 
         raise Exception('Wrong dataset, the signal must be a 2D array!')
@@ -309,19 +318,16 @@ def MIF_v3(f,options,M=np.array([]),window_file=None):
         Ni=0
     else:
         Ni=int(np.round(np.max(N_o)/2))
-        if opts.extensionType != 'wrap':
-            f = wextend(f,Ni,opts.extensionType)
+        f = wextend(f,Ni,opts.extensionType)
     N = f.shape
     
     IMF = np.zeros(list(N).insert(0,options.NIMFs))
     Norm1f = np.max(np.abs(f))#LA.norm(f, np.inf)
     f = f/Norm1f
+
+
 ///////
     
-    ###############################################################
-    #                   Iterative Filtering                       #
-    ###############################################################
-    MM = loadmat(window_file)['MM'].flatten()
 
     ### Create a signal without zero regions and compute the number of extrema ###
     f_pp = np.delete(f, np.argwhere(abs(f)<=tol))

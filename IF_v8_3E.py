@@ -21,7 +21,7 @@ from numpy import fft
 import time
 #import pandas as pd
 import timeit
-from numba import jit
+from numba import jit,njit
 
 __version__='8.3e'
 
@@ -76,106 +76,332 @@ def get_window_file_path():
 ################################################################################
 ###################### Iterative Filtering aux functions #######################
 ################################################################################
-def Maxmins(x,tol,mode='open'):
-    """
-    Wrapped from: Maxmins_v3_8 in FIF_v2_13.m
-    """
-    @jit(nopython=True) 
-    def maxmins_wrap(x,df, N,Maxs,Mins):
+#def Maxmins(x,tol,mode='open'):
+#    """
+#    Wrapped from: Maxmins_v3_8 in FIF_v2_13.m
+#    """
+#    @jit(nopython=True) 
+#    def maxmins_wrap(x,df, N,Maxs,Mins):
+#
+#        h = 1
+#        while h<N and np.abs(df[h]/x[h]) <= tol:
+#            h = h + 1
+#   
+#        if h==N:
+#            return None, None
+#
+#        cmaxs = 0
+#        cmins = 0
+#        c = 0
+#        N_old = N
+#        
+#        df = np.zeros(N+h)
+#        df[0:N] = x
+#        df[N:N+h] = x[1:h+1]
+#        for i in range(N+h-1):
+#            df[i] = df[i+1] - df[i]
+#        
+#        f = np.zeros(N+h-1)
+#        f[0:N] = x
+#        f[N:] = f[1:h]
+#        
+#        N = N+h
+#        #beginfor
+#        for i in range(h-1,N-2):
+#            if abs(df[i]*df[i+1]/f[i]**2) <= tol :
+#                if df[i]/abs(f[i]) < -tol:
+#                    last_df = -1
+#                    posc = i
+#                elif df[i]/abs(f[i]) > tol:
+#                    last_df = +1
+#                    posc = i
+#                elif df[i] == 0:
+#                    last_df = 0
+#                    posc = i
+#
+#                c = c+1
+#
+#                if df[i+1]/abs(f[i]) < -tol:
+#                    if last_df == 1 or last_df == 0:
+#                        cmaxs = cmaxs +1
+#                        Maxs[cmaxs] = (posc + (c-1)//2 +1)%N_old
+#                    c = 0
+#                
+#                if df[i+1]/abs(f[i]) > tol:
+#                    if last_df == -1 or last_df == 0:
+#                        cmins = cmins +1
+#                        Mins[cmins] = (posc + (c-1)//2 +1)%N_old
+#                    c = 0
+#
+#            if df[i]*df[i+1]/f[i]**2 < -tol:
+#                if df[i]/abs(f[i]) < -tol and df[i+1]/abs(f[i]) > tol:
+#                    cmins  =cmins+1
+#                    Mins[cmins] = (i+1)%N_old
+#                    if Mins[cmins]==0:
+#                        Mins[cmins]=1
+#                    last_df=-1
+#
+#                elif df[i]/abs(f[i]) > tol and df[i+1]/abs(f[i])  < -tol:
+#                    cmaxs = cmaxs+1
+#                    Maxs[cmaxs] = (i+1)%N_old
+#                    if Maxs[cmaxs] == 0:
+#                        Maxs[cmaxs]=1
+#            
+#                    last_df =+1
+#
+#        if c>0:
+#            if cmins>0 and Mins[cmins] == 0 : Mins[cmins] = N
+#            if cmaxs>0 and Maxs[cmaxs] == 0 : Maxs[cmaxs] = N
+#
+#        return Maxs[0:cmaxs], Mins[0:cmins]
+#
+#    N = np.size(x)
+#
+#    Maxs = np.zeros(N)
+#    Mins = np.zeros(N)
+#    
+#    df = np.diff(x)
+#
+#    if mode == 'wrap':
+#        Maxs, Mins = maxmins_wrap(x,df,N,Maxs,Mins)
+#        if Maxs is None or Mins is None:
+#            return None,None,None
+#
+#        maxmins = np.sort(np.concatenate((Maxs,Mins) ))
+#        
+#        if any(Mins ==0): Mins[Mins == 0] = 1
+#        if any(Maxs ==0): Maxs[Maxs == 0] = 1
+#        if any(maxmins ==0): maxmins[maxmins == 0] = 1
+#
+#    return maxmins,Maxs,Mins
+#def find_max_frequency(f,tol, mode = 'clip'):
+#
+#    f_pp = np.delete(f, np.argwhere(abs(f)<=tol))
+#    if np.size(f_pp) < 1: 
+#        print('Signal too small')
+#        return None,None
+#
+#    maxmins_pp = Maxmins(np.concatenate([f_pp, f_pp[:10]]),tol,mode = mode)    
+#    maxmins_pp = maxmins_pp[0] 
+#    if len(maxmins_pp) < 1:
+#        print('No extrema detected')
+#        return None,None
+#    
+#    maxmins_pp = maxmins_pp[maxmins_pp<f_pp.size]
+#
+#    diffMaxmins_pp = np.diff(maxmins_pp)
+#    
+#    N_pp = len(f_pp)
+#    k_pp = maxmins_pp.shape[0]
 
-        h = 1
-        while h<N and np.abs(df[h]/x[h]) <= tol:
-            h = h + 1
+def Maxmins(x, tol = 1e-12, mode = 'clip', method = 'zerocrossing'):
+    """
+    method: str
+        'argrelextrema': compute maxima and minima using argrelextrema. Ignores tol
+        'zerocrossing' : compute maxima and minima using zero crossing of 1st derivative.
+                         If diff through the crossing is less than tol, the point is ignored. 
+    """
+    if method == 'argrelextrema':
+        from scipy.signal import argrelextrema
+        maxima = argrelextrema(x, np.greater, mode = mode)
+        minima = argrelextrema(x, np.less, mode = mode)
+
+        extrema = np.sort(np.concatenate((maxima, minima), axis=1))
+    elif method == 'zerocrossing':
+        dx = np.diff(x) #naive derivative
+        sgns = np.diff(np.sign(dx)) #location of maxmins: max/min where sgns = -2/+2
+        extrema = np.where(sgns != 0)[0]
+        if len(extrema) < 1: return None
+        dx = np.abs(dx[1:][extrema])
+        extrema = extrema[dx>tol]
+        if len(extrema) < 1: return None
+
+    else: raise Exception('WRONG INPUT METHOD!')
+
+    return extrema.squeeze()
    
-        if h==N:
-            return None, None
 
-        cmaxs = 0
-        cmins = 0
-        c = 0
-        N_old = N
-        
-        df = np.zeros(N+h)
-        df[0:N] = x
-        df[N:N+h] = x[1:h+1]
-        for i in range(N+h-1):
-            df[i] = df[i+1] - df[i]
-        
-        f = np.zeros(N+h-1)
-        f[0:N] = x
-        f[N:] = f[1:h]
-        
-        N = N+h
-        #beginfor
-        for i in range(h-1,N-2):
-            if abs(df[i]*df[i+1]/f[i]**2) <= tol :
-                if df[i]/abs(f[i]) < -tol:
-                    last_df = -1
-                    posc = i
-                elif df[i]/abs(f[i]) > tol:
-                    last_df = +1
-                    posc = i
-                elif df[i] == 0:
-                    last_df = 0
-                    posc = i
+def find_max_frequency(f,tol, **kwargs):
+    """
+    find extrema contained in f and returns
+    N_pp,k_pp,maxmins,diffMaxmins
 
-                c = c+1
-
-                if df[i+1]/abs(f[i]) < -tol:
-                    if last_df == 1 or last_df == 0:
-                        cmaxs = cmaxs +1
-                        Maxs[cmaxs] = (posc + (c-1)//2 +1)%N_old
-                    c = 0
-                
-                if df[i+1]/abs(f[i]) > tol:
-                    if last_df == -1 or last_df == 0:
-                        cmins = cmins +1
-                        Mins[cmins] = (posc + (c-1)//2 +1)%N_old
-                    c = 0
-
-            if df[i]*df[i+1]/f[i]**2 < -tol:
-                if df[i]/abs(f[i]) < -tol and df[i+1]/abs(f[i]) > tol:
-                    cmins  =cmins+1
-                    Mins[cmins] = (i+1)%N_old
-                    if Mins[cmins]==0:
-                        Mins[cmins]=1
-                    last_df=-1
-
-                elif df[i]/abs(f[i]) > tol and df[i+1]/abs(f[i])  < -tol:
-                    cmaxs = cmaxs+1
-                    Maxs[cmaxs] = (i+1)%N_old
-                    if Maxs[cmaxs] == 0:
-                        Maxs[cmaxs]=1
-            
-                    last_df =+1
-
-        if c>0:
-            if cmins>0 and Mins[cmins] == 0 : Mins[cmins] = N
-            if cmaxs>0 and Maxs[cmaxs] == 0 : Maxs[cmaxs] = N
-
-        return Maxs[0:cmaxs], Mins[0:cmins]
-
-    N = np.size(x)
-
-    Maxs = np.zeros(N)
-    Mins = np.zeros(N)
+    N_pp : int, f.size
+    k_pp : int, number of extrema found
+    maxmins: array of integer (size k_pp), index (location) of extrema
+    diffMaxmins: array of integer (size k_pp -1): distance between neighbohr extrema
+    """
     
-    df = np.diff(x)
+    maxmins = Maxmins(f,tol,mode,**kwargs)
+    print('No extrema detected')
+    return None,None
+    
+    diffMaxmins = np.diff(maxmins)
+    
+    N_pp = len(f)
+    k_pp = maxmins.shape[0]
 
-    if mode == 'wrap':
-        Maxs, Mins = maxmins_wrap(x,df,N,Maxs,Mins)
-        if Maxs is None or Mins is None:
-            return None,None,None
+    return N_pp, k_pp, maxmins, diffMaxmins
 
-        maxmins = np.sort(np.concatenate((Maxs,Mins) ))
+
+def get_mask_length(options,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs):
+    
+    if isinstance(options.alpha,str):
+    
+        if options.alpha == 'ave': 
+            m = 2*np.round(N_pp/k_pp*options.Xi)
+        elif options.alpha == 'Almost_min': 
+            m = 2*np.min( [options.Xi*np.percentile(diffMaxmins_pp,30), np.round(N_pp/k_pp*options.Xi)])
+        elif options.alpha == 'Median':
+            m = 2*np.round(np.median(diffMaxmins_pp)*options.Xi)
+        else:    
+            raise Exception('Value of alpha not recognized!\n')
+    
+    else:
+        m = 2*np.round(options.Xi*np.percentile(diffMaxmins_pp,options.alpha))
+    
+    if countIMFs > 1:
+        if m <= logM:
+            if options.verbose:
+                print('Warning mask length is decreasing at step %1d. ' % countIMFs)
+            if options.MonotoneMaskLength:
+                m = np.ceil(logM * 1.1)
+                if options.verbose:
+                    print('The old mask length is %1d whereas the new one is forced to be %1d.\n' % (
+                    logM, m))
+            else:
+                if options.verbose:
+                    print('The old mask length is %1d whereas the new one is %1d.\n' % (logM, m))
+
+    return m
+
+def get_mask_v1_1(y, k,verbose,tol):
+    """
+    Rescale the mask y so that its length becomes 2*k+1.
+    k could be an integer or not an integer.
+    y is the area under the curve for each bar
+    
+    wrapped from FIF_v2_13.m
+    
+    """
+    n = np.size(y)
+    m = (n-1)//2
+    k = int(k)
+
+    if k<=m:
+
+        if np.mod(k,1) == 0:
+            
+            a = np.zeros(2*k+1)
+            
+            for i in range(1, 2*k+2):
+                s = (i-1)*(2*m+1)/(2*k+1)+1
+                t = i*(2*m+1)/(2*k+1)
+
+                s2 = np.ceil(s) - s
+
+                t1 = t - np.floor(t)
+
+                if np.floor(t)<1:
+                    print('Ops')
+
+                a[i-1] = np.sum(y[int(np.ceil(s))-1:int(np.floor(t))]) +\
+                         s2*y[int(np.ceil(s))-1] + t1*y[int(np.floor(t))-1]
+        else:
+            new_k = int(np.floor(k))
+            extra = k - new_k
+            c = (2*m+1)/(2*new_k+1+2*extra)
+
+            a = np.zeros(2*new_k+3)
+
+            t = extra*c + 1
+            t1 = t - np.floor(t)
+
+            if k<0:
+                print('Ops')
+                a = []
+                return a
+
+            a[0] = np.sum(y[:int(np.floor(t))]) + t1*y[int(np.floor(t))-1]
+
+            for i in range(2, 2*new_k+3):
+                s = extra*c + (i-2)*c+1
+                t = extra*c + (i-1)*c
+                s2 = np.ceil(s) - s
+                t1 = t - np.floor(t)
+
+                a[i-1] = np.sum(y[int(np.ceil(s))-1:int(np.floor(t))]) +\
+                         s2*y[int(np.ceil(s))-1] + t1*y[int(np.floor(t))-1]
+            t2 = np.ceil(t) - t
+
+            a[2*new_k+2] = np.sum(y[int(np.ceil(t))-1:n]) + t2*y[int(np.ceil(t))-1]
+
+    else: # We need a filter with more points than MM, we use interpolation
+        dx = 0.01
+        # we assume that MM has a dx = 0.01, if m = 6200 it correspond to a
+        # filter of length 62*2 in the physical space
+        f = y/dx
+        dy = m*dx/k
+        # b = np.interp(list(range(1,int(m+1),m/k)), list(range(0,int(m+1))), f[m:2*m+1])
+        b = np.interp(np.linspace(0,m,int(np.ceil(k+1))), np.linspace(0,m,m+1), f[m:2*m+1])
+
+        a = np.concatenate((np.flipud(b[1:]), b))*dy
+
+        if abs(LA.norm(a,1)-1)>tol:
+            if verbose:
+                print('\n\n Warning!\n\n')
+                print(' Area under the mask equals %2.20f\n'%(LA.norm(a,1),))
+                print(' it should be equal to 1\n We rescale it using its norm 1\n\n')
+            a = a/LA.norm(a,1)
         
-        if any(Mins ==0): Mins[Mins == 0] = 1
-        if any(Maxs ==0): Maxs[Maxs == 0] = 1
-        if any(maxmins ==0): maxmins[maxmins == 0] = 1
+    return a
 
-    return maxmins,Maxs,Mins
+def compute_imf(f,a,options):
+        
+    h = np.array(f)
+    h_ave = np.zeros(len(h))
 
+    @njit
+    def iterate_numba(h,h_ave,kernel,delta,MaxInner):
+        
+        inStepN = 0
+        SD = 1.
+        
+        ker_size = len(kernel)
+        hker_size = ker_size//2
+        kernel(hker_size) -=1 #so we get the high frequency filter 
+        
+        Nh = len(h)
+        while SD>delta and inStepN<MaxInner:
+            inStepN += 1
+            #convolving the function with the mask: High Pass filter
+            #convolving edges (influence cone)
+            for i in range(hker_size):
+                for j in range(i+hker_size+1): 
+                    h_ave[i] += h[j] * kernel[hker_size-i+j] 
+                    h_ave[-i-1] += h[-j] * kernel[-j] 
+            #convolving inner part
+            for i in range(hker_size, Nh - hker_size):
+                for j in range(kernel_size): h_ave[i] += h[i-hker_size+j] * kernel[j] 
 
+            #computing norm
+            SD =  0
+            hnorm = 0
+            for i in range(Nh):
+                SD+= (h_ave[i] - h[i])**2
+                hnorm+= h[i]**2
+            SD /=hnorm
+            h = h_ave
+            h_ave[:] = 0
+        
+        return h,inStepN,SD
+
+    h_ave, inStepN, SD = iterate_numba(h,h_ave,a,options.delta,options.MaxInner)
+    
+    if options.verbose:
+        print('    %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+
+    return h_ave,inStepN,SD
 ################################################################################
 ###################### Iterative Filtering main functions ######################
 ################################################################################
@@ -207,7 +433,7 @@ def Settings(**kwargs):
     options['NumSteps']=1
     options['MaskLengthType']='angle'
     options['BCmode'] = 'clip' #wrap
-
+    options['Maxmins_method'] = 'zerocrossing'
     for i in kwargs:
         if i in options.keys() : options[i] = kwargs[i] 
     return AttrDictSens(options)
@@ -220,7 +446,7 @@ def IF_run(x, options=None, M = np.array([]),**kwargs):
     return IF_v8_3e(x,options,M=M,**kwargs)
 
 
-def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthreads = 1,verbose = True):
+def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthreads = 1):
 
     """
     Iterative Filtering python implementation (version 8) Parallel version
@@ -237,7 +463,8 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     data_mask : None or boolean array of size x
         used to mask data that wont be used to determine the size of the window mask (LogM).
     """
-    if verbose:
+    opts = options
+    if opts.verbose:
         print('running IF decomposition...')
         #if verbose:
         print('****IF settings****')
@@ -246,16 +473,16 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     
     tol = 1e-18 
 
-
-
-    f = np.asarray(f)
-    if len(f.shape) > 1: 
-        raise Exception('Wrong dataset, the signal must be a 1D array!')
-    
     #loading master filter
     if window_file is None:
         window_file = get_window_file_path()
-    MM = loadmat(window_file)['MM'].flatten()
+    try:
+        MM = loadmat(window_file)['MM'].flatten()
+    except:
+        raise ValueError("ERROR! Could not load window function from file: "+window_file)
+    f = np.asarray(f)
+    if len(f.shape) > 1: 
+        raise Exception('Wrong dataset, the signal must be a 1D array!')
     
     #setting up machinery
     N = f.size
@@ -267,5 +494,56 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     #NOW starting the calculation of the IMFs
 
     #Find max-frequency contained in signal
+    N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f,tol, opts.BCmode, opts.Maxmins_method)
+    
+    countIMFs = 0
+    stats_list = []
+    
+    ### Begin Iterating ###
+    while countIMFs < opts.NIMFs and k_pp >= opts.ExtPoints:
+        countIMFs += 1
+        print('IMF', countIMFs)
+        
+        h = f
+        if 'M' not in locals() or np.size(M)<countIMFs:
+            m = get_mask_length(options,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs)
+        else:
+            m = M[countIMFs-1]
+        
+        if opts.verbose:
+            print('\n IMF # %1.0d   -   # Extreme points %5.0d\n' %(countIMFs,k_pp))
+            print('\n  step #            SD             Mask length \n\n')
 
+        stats = AttrDictSens({'logM': [], 'inStepN': [], 'diffMaxmins_pp': []})
+        stats['logM'].append(int(m))
+
+        a = get_mask_v1_1(MM, m,opts.verbose,tol)
+        #if the mask is bigger than the signal length, the decomposition ends.
+        if N < np.size(a): 
+            if opts.verbose: print('Mask length exceeds signal length. Finishing...')
+            break
+
+        h, inStepN, SD = compute_imf(h,a,opts)
+        
+        if inStepN >= opts.MaxInner:
+            print('Max # of inner steps reached')
+
+        stats['inStepN'].append(inStepN)
+        
+        IMF[countIMFs-1, :] = h
+        
+        f = f - h
+    
+        #Find max-frequency contained in residual signal
+        N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f,tol, opts.BCmode, opts.Maxmins_method)
+        
+        stats_list.append(stats)
+
+    IMF = IMF[0:countIMFs, :]
+    IMF = np.vstack([IMF, f[:]])
+
+    IMF = IMF*Norm1f # We scale back to the original values
+
+
+    return IMF, stats_list
 
