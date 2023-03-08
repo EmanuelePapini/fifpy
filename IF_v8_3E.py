@@ -369,7 +369,7 @@ def compute_imf(f,a,options):
         
         ker_size = len(kernel)
         hker_size = ker_size//2
-        kernel(hker_size) -=1 #so we get the high frequency filter 
+        #kernel[hker_size] -=1 #so we get the high frequency filter 
         
         Nh = len(h)
         while SD>delta and inStepN<MaxInner:
@@ -382,16 +382,16 @@ def compute_imf(f,a,options):
                     h_ave[-i-1] += h[-j] * kernel[-j] 
             #convolving inner part
             for i in range(hker_size, Nh - hker_size):
-                for j in range(kernel_size): h_ave[i] += h[i-hker_size+j] * kernel[j] 
+                for j in range(ker_size): h_ave[i] += h[i-hker_size+j] * kernel[j] 
 
             #computing norm
             SD =  0
             hnorm = 0
             for i in range(Nh):
-                SD+= (h_ave[i] - h[i])**2
+                SD+= h_ave[i]**2
                 hnorm+= h[i]**2
             SD /=hnorm
-            h = h_ave
+            h[:] = h[:] - h_ave[:]
             h_ave[:] = 0
         
         return h,inStepN,SD
