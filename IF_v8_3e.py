@@ -70,7 +70,7 @@ class AttrDictSens(dict):
 def get_window_file_path():
     import sys
     _path_=sys.modules[__name__].__file__[0:-12]
-    return _path_+'prefixed_double_filter.mat'
+    return _path_+'/prefixed_double_filter.mat'
 
 
 ################################################################################
@@ -215,13 +215,13 @@ def Maxmins(x, tol = 1e-12, mode = 'clip', method = 'zerocrossing'):
         dx = np.abs(dx[1:][extrema])
         extrema = extrema[dx>tol]
         if len(extrema) < 1: return None
-
+        extrema +=1
     else: raise Exception('WRONG INPUT METHOD!')
 
     return extrema.squeeze()
    
 
-def find_max_frequency(f,tol, **kwargs):
+def find_max_frequency(f, **kwargs):
     """
     find extrema contained in f and returns
     N_pp,k_pp,maxmins,diffMaxmins
@@ -232,9 +232,10 @@ def find_max_frequency(f,tol, **kwargs):
     diffMaxmins: array of integer (size k_pp -1): distance between neighbohr extrema
     """
     
-    maxmins = Maxmins(f,tol,mode,**kwargs)
-    print('No extrema detected')
-    return None,None
+    maxmins = Maxmins(f,**kwargs)
+    if len(maxmins) < 1:
+        print('No extrema detected')
+        return None,None
     
     diffMaxmins = np.diff(maxmins)
     
@@ -379,7 +380,7 @@ def compute_imf(f,a,options):
             for i in range(hker_size):
                 for j in range(i+hker_size+1): 
                     h_ave[i] += h[j] * kernel[hker_size-i+j] 
-                    h_ave[-i-1] += h[-j] * kernel[-j] 
+                    h_ave[-i-1] += h[-j-1] * kernel[hker_size+i-j] 
             #convolving inner part
             for i in range(hker_size, Nh - hker_size):
                 for j in range(ker_size): h_ave[i] += h[i-hker_size+j] * kernel[j] 
@@ -431,7 +432,6 @@ def Settings(**kwargs):
     options['MaxInner']=200
     options['MonotoneMaskLength']=True
     options['NumSteps']=1
-    options['MaskLengthType']='angle'
     options['BCmode'] = 'clip' #wrap
     options['Maxmins_method'] = 'zerocrossing'
     for i in kwargs:
@@ -494,11 +494,11 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     #NOW starting the calculation of the IMFs
 
     #Find max-frequency contained in signal
-    N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f,tol, opts.BCmode, opts.Maxmins_method)
+    N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
     
     countIMFs = 0
     stats_list = []
-    
+    logM = 1 
     ### Begin Iterating ###
     while countIMFs < opts.NIMFs and k_pp >= opts.ExtPoints:
         countIMFs += 1
@@ -516,11 +516,13 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
 
         stats = AttrDictSens({'logM': [], 'inStepN': [], 'diffMaxmins_pp': []})
         stats['logM'].append(int(m))
-
+        logM = int(m)
+        
         a = get_mask_v1_1(MM, m,opts.verbose,tol)
         #if the mask is bigger than the signal length, the decomposition ends.
         if N < np.size(a): 
             if opts.verbose: print('Mask length exceeds signal length. Finishing...')
+            countIMFs -= 1
             break
 
         h, inStepN, SD = compute_imf(h,a,opts)
@@ -535,7 +537,7 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         f = f - h
     
         #Find max-frequency contained in residual signal
-        N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f,tol, opts.BCmode, opts.Maxmins_method)
+        N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
         
         stats_list.append(stats)
 
