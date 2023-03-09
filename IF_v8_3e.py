@@ -21,7 +21,7 @@ from numpy import fft
 import time
 #import pandas as pd
 import timeit
-from numba import jit,njit
+from numba import jit,njit,prange,get_num_threads,set_num_threads
 
 __version__='8.3e'
 
@@ -362,7 +362,7 @@ def compute_imf(f,a,options):
     h = np.array(f)
     h_ave = np.zeros(len(h))
 
-    @njit
+    @njit(parallel=True)
     def iterate_numba(h,h_ave,kernel,delta,MaxInner):
         
         inStepN = 0
@@ -377,12 +377,12 @@ def compute_imf(f,a,options):
             inStepN += 1
             #convolving the function with the mask: High Pass filter
             #convolving edges (influence cone)
-            for i in range(hker_size):
+            for i in prange(hker_size):
                 for j in range(i+hker_size+1): 
                     h_ave[i] += h[j] * kernel[hker_size-i+j] 
                     h_ave[-i-1] += h[-j-1] * kernel[hker_size+i-j] 
             #convolving inner part
-            for i in range(hker_size, Nh - hker_size):
+            for i in prange(hker_size, Nh - hker_size):
                 for j in range(ker_size): h_ave[i] += h[i-hker_size+j] * kernel[j] 
 
             #computing norm
@@ -446,7 +446,7 @@ def IF_run(x, options=None, M = np.array([]),**kwargs):
     return IF_v8_3e(x,options,M=M,**kwargs)
 
 
-def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthreads = 1):
+def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthreads = None):
 
     """
     Iterative Filtering python implementation (version 8) Parallel version
@@ -464,13 +464,14 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         used to mask data that wont be used to determine the size of the window mask (LogM).
     """
     opts = options
+    if nthreads is not None: set_num_threads(nthreads)
     if opts.verbose:
         print('running IF decomposition...')
         #if verbose:
         print('****IF settings****')
         [print(i,options[i]) for i in options]
         print('data_mask   : ', data_mask is not None )
-    
+        print('Using nthreads: ',get_num_threads())
     tol = 1e-18 
 
     #loading master filter

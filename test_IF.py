@@ -1,9 +1,16 @@
 import numpy as np
 import IF_v8_3e as itf
 import pylab as plt
+from blombly.tools import time
+
+profile = False
+if profile:
+    import cProfile
+
+timeit = time.timeit()
 plt.ion()
 
-n=300
+n=30000
 size=11
 sigma=3
 
@@ -13,7 +20,10 @@ y1 = np.cos(10*x+2.3)
 y = np.sin(2*x) + np.cos(10*x+2.3)
 
 opts = itf.Settings(verbose=True,Xi=2.0)
-IMF,stats = itf.IF_v8_3e(y,opts)
+if profile:
+    timeit.tic; cProfile.run("IMF,stats = itf.IF_v8_3e(y,opts)",'IF_profiled'); timeit.toc
+else:
+    timeit.tic; IMF,stats = itf.IF_v8_3e(y,opts); timeit.toc
 #y = np.zeros(n)
 #
 #y[n//2] = 1
