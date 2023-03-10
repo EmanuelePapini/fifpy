@@ -1,42 +1,8 @@
 
 import numpy as np
 from numba import njit,prange
+import if_parallel
 
-def convolve_high(f,a):
-        
-    h = np.array(f)
-    h_ave = np.zeros(len(h))
-    ker = np.array(a)
-    
-    @njit
-    def iterate_numba(h,h_ave,kernel):
-        
-        ker_size = len(kernel)
-        hker_size = ker_size//2
-        kernel[hker_size] -=1 #so we get the high frequency filter 
-        
-        Nh = len(h)
-        for i in range(hker_size):
-            for j in range(i+hker_size+1): 
-                h_ave[i] += h[j] * kernel[hker_size-i+j] 
-                h_ave[-i-1] += h[-j] * kernel[-j] 
-        #convolving inner part
-        for i in range(hker_size, Nh - hker_size):
-            for j in range(ker_size): h_ave[i] += h[i-hker_size+j] * kernel[j] 
-
-        #computing norm
-        SD =  0
-        hnorm = 0
-        for i in range(Nh):
-            SD+= (h_ave[i] - h[i])**2
-            hnorm+= h[i]**2
-        SD /=hnorm
-        h[:] = -h_ave[:]
-        h_ave[:] = 0
-        
-        return h,SD
-    
-    return iterate_numba(h,h_ave,ker)
 
 def convolve_high(f,a):
         
@@ -50,12 +16,12 @@ def convolve_high(f,a):
         hker_size = ker_size//2
         
         Nh = len(h)
-        for i in range(hker_size):
+        for i in prange(hker_size):
             for j in range(i+hker_size+1): 
                 h_ave[i] += h[j] * kernel[hker_size-i+j] 
-                h_ave[-i-1] += h[-j] * kernel[-j] 
+                h_ave[-i-1] += h[-j-1] * kernel[hker_size+i-j] 
         #convolving inner part
-        for i in range(hker_size, Nh - hker_size):
+        for i in prange(hker_size, Nh - hker_size):
             for j in range(ker_size): h_ave[i] += h[i-hker_size+j] * kernel[j] 
 
         #computing norm
@@ -72,14 +38,6 @@ def convolve_high(f,a):
     
     return iterate_numba(h,h_ave,ker)
 
-def gaussian_filter1d(size,sigma):
-
-    x = np.linspace(-int(size/2),int(size/2),size)
-
-    #gaussian_filter = [1 / (sigma * np.sqrt(2*np.pi)) * np.exp(-x**2/(2*sigma**2)) for x in filter_range]
-    gaussian_filter = 1 / (sigma * np.sqrt(2*np.pi)) * np.exp(-x**2/(2*sigma**2)) 
-
-    return gaussian_filter
 
 def get_mask_v1_1(y, k,verbose,tol):
     """
@@ -162,12 +120,13 @@ def get_mask_v1_1(y, k,verbose,tol):
         
     return a
 
-n=100
-size=11
+n=1000000
+size=1000
 sigma=3
 
-gfilt = gaussian_filter1d(size,sigma)
 from scipy.io import loadmat
+from blombly.tools import time
+tt=time.timeit()
 MM = loadmat('prefixed_double_filter.mat')['MM'].flatten()
 a = get_mask_v1_1(MM, size,True,1e-12)
 
@@ -180,10 +139,19 @@ y = np.zeros(n)
 y[n//2] = 1
 y[n//2+size//2] = 4
 y[n-3] = 1
+tt.tic
 (convhigh,SD) = convolve_high(y,a)
+tt.toc
+
+conv =if_parallel.iterfilt.convolve
+
+tt.tic
+fout = conv(y,a,y.size,a.size,4)
+tt.toc
+
 import pylab as plt
 plt.ion()
 plt.figure()
 plt.plot(y)
-
-
+plt.plot(convhigh)
+plt.plot(fout,'--')
