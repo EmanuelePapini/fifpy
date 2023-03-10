@@ -420,6 +420,7 @@ def Settings(**kwargs):
     #options['saveEnd'] = 0
     #options['saveInter'] = 0
     options['verbose'] = False    
+    options['timeit'] = False    
     #options['plots'] = 0.0
     #options['saveplots'] = 0     
         
@@ -475,6 +476,15 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     tol = 1e-18 
 
     #loading master filter
+    ift = opts.timeit
+    if ift: 
+        from . import time
+        ttime = time.timeit()
+        time_imfs = 0.
+        time_max_nu = 0.
+        time_mask = 0.
+        ttime.tic
+
     if window_file is None:
         window_file = get_window_file_path()
     try:
@@ -495,8 +505,10 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     #NOW starting the calculation of the IMFs
 
     #Find max-frequency contained in signal
+    if ift: ttime.tic 
     N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
-    
+    if ift: time_max_nu += ttime.get_toc
+
     countIMFs = 0
     stats_list = []
     logM = 1 
@@ -519,14 +531,18 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         stats['logM'].append(int(m))
         logM = int(m)
         
+        if ift: ttime.tic 
         a = get_mask_v1_1(MM, m,opts.verbose,tol)
+        if ift: time_mask += ttime.get_toc
         #if the mask is bigger than the signal length, the decomposition ends.
         if N < np.size(a): 
             if opts.verbose: print('Mask length exceeds signal length. Finishing...')
             countIMFs -= 1
             break
 
+        if ift: ttime.tic 
         h, inStepN, SD = compute_imf(h,a,opts)
+        if ift: time_imfs += ttime.get_toc
         
         if inStepN >= opts.MaxInner:
             print('Max # of inner steps reached')
@@ -538,7 +554,9 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         f = f - h
     
         #Find max-frequency contained in residual signal
+        if ift: ttime.tic 
         N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
+        if ift: time_max_nu += ttime.get_toc
         
         stats_list.append(stats)
 
@@ -547,6 +565,11 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
 
     IMF = IMF*Norm1f # We scale back to the original values
 
+    if ift: 
+        ttime.total_elapsed(from_1st_start = True, hhmmss = True)
+        print('imfs calculation took: %f (%.2f)' % (time_imfs,100* time_imfs / ttime._dttot)) 
+        print('mask calculation took: %f (%.2f)' % (time_mask,100* time_mask / ttime._dttot)) 
+        print('mask length calculation took: %f (%.2f)' % (time_max_nu,100* time_max_nu / ttime._dttot)) 
 
     return IMF, stats_list
 
