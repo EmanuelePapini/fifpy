@@ -38,6 +38,34 @@ def convolve_high(f,a):
     
     return iterate_numba(h,h_ave,ker)
 
+#def test_convolve_high_fft(f,a):
+#
+#    nf = f.size; na = a.size
+#    if na < nf : 
+#        npad = (nf-na)//2
+#        npadr = npad+1 if nf //2 else npad
+#        fa = np.fft.fft(np.pad(a,(0,nf-na)))
+#    ff = np.fft.fft(f)
+#
+#    return f - np.fft.ifft((ff*fa.conj() + ff.conj()*fa)/2).real
+#
+#def fft_convolve1d(x,y): #1d cross correlation, fft
+#
+#    """ 1D convolution, using FFT """
+#
+#    yy=np.pad(y,(0,x.size-y.size))
+#    fr=np.fft.fft(x)
+#
+#    fr2=np.fft.fft(np.flipud(yy))
+#
+#    cc=np.real(np.fft.ifft(fr*fr2))
+#
+#    return x-np.fft.fftshift(cc)
+
+def scipy_fftconvolve_high(f,a):
+    from scipy.signal import fftconvolve
+
+    return f - fftconvolve(f,a,mode='same')
 
 def get_mask_v1_1(y, k,verbose,tol):
     """
@@ -121,7 +149,7 @@ def get_mask_v1_1(y, k,verbose,tol):
     return a
 
 n=1000000
-size=1000
+size=10000
 sigma=3
 
 from scipy.io import loadmat
@@ -138,7 +166,7 @@ y = np.zeros(n)
 
 y[n//2] = 1
 y[n//2+size//2] = 4
-y[n-3] = 1
+y[n-1] = 1
 tt.tic
 (convhigh,SD) = convolve_high(y,a)
 tt.toc
@@ -154,4 +182,6 @@ plt.ion()
 plt.figure()
 plt.plot(y)
 plt.plot(convhigh)
-plt.plot(fout,'--')
+plt.plot(fout)
+tt.tic; fftf = scipy_fftconvolve_high(y,a);tt.toc
+plt.plot(fftf,'--')
