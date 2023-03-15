@@ -357,7 +357,7 @@ def get_mask_v1_1(y, k,verbose,tol):
         
     return a
 
-def compute_imf(f,a,options):
+def compute_imf_numba(f,a,options):
         
     h = np.array(f)
     h_ave = np.zeros(len(h))
@@ -400,19 +400,58 @@ def compute_imf(f,a,options):
     h_ave, inStepN, SD = iterate_numba(h,h_ave,a,options.delta,options.MaxInner)
     
     if options.verbose:
-        print('    %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+        print('(numba): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
 
     return h_ave,inStepN,SD
+
+def compute_imf_fft(f,a,options):
+        
+    from scipy.signal import fftconvolve
+
+    h = np.array(f)
+    h_ave = np.zeros(len(h))
+
+    kernel = a
+    delta = options.delta
+    MaxInner = options.MaxInner
+    
+        
+    inStepN = 0
+    SD = 1.
+    
+    ker_size = len(kernel)
+    hker_size = ker_size//2
+    #kernel[hker_size] -=1 #so we get the high frequency filter 
+    
+    Nh = len(h)
+    while SD>delta and inStepN<MaxInner:
+        inStepN += 1
+        h_ave = fftconvolve(h,kernel,mode='same')
+        #computing norm
+        SD = LA.norm(h_ave)**2/LA.norm(h)**2
+        h[:] = h[:] - h_ave[:]
+        h_ave[:] = 0
+        if options.verbose:
+            print('(fft): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+    
+
+    
+    if options.verbose:
+        print('(fft): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+
+    return h,inStepN,SD
 ################################################################################
 ###################### Iterative Filtering main functions ######################
 ################################################################################
 
 def Settings(**kwargs):
     """
-    Sets the default options to be passed to FIF
+    Sets the default options to be passed to xFIF
     WARNING: NO CHECK IS DONE ON THE VALIDITY OF THE INPUT
     
     WRAPPED FROM: Settings_v3.m
+    NOTE:
+    selecting options['imf_method'] = fft should be equivalent to do FIF
     """
 
     options = {}
@@ -435,6 +474,7 @@ def Settings(**kwargs):
     options['NumSteps']=1
     options['BCmode'] = 'clip' #wrap
     options['Maxmins_method'] = 'zerocrossing'
+    options['imf_method'] = 'fft' #numba
     for i in kwargs:
         if i in options.keys() : options[i] = kwargs[i] 
     return AttrDictSens(options)
@@ -464,16 +504,24 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     data_mask : None or boolean array of size x
         used to mask data that wont be used to determine the size of the window mask (LogM).
     """
-    opts = options
-    if nthreads is not None: set_num_threads(nthreads)
+    opts = AttrDictSens(options)
+    if nthreads is not None:
+        if opts.imf_method == 'numba': 
+            set_num_threads(nthreads)
     if opts.verbose:
         print('running IF decomposition...')
         #if verbose:
         print('****IF settings****')
-        [print(i,options[i]) for i in options]
+        [print(i+':',options[i]) for i in options]
         print('data_mask   : ', data_mask is not None )
-        print('Using nthreads: ',get_num_threads())
+        if opts.imf_method == 'numba':
+            print('Using nthreads: ',get_num_threads())
     tol = 1e-18 
+
+    if opts.imf_method == 'fft': 
+        compute_imf = compute_imf_fft
+    elif opts.imf_method == 'numba': 
+        compute_imf = compute_imf_numba
 
     #loading master filter
     ift = opts.timeit
@@ -497,7 +545,7 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     
     #setting up machinery
     N = f.size
-    IMF = np.zeros([options.NIMFs, N])
+    IMF = np.zeros([opts.NIMFs, N])
     #normalizing signal such as the maximum is +-1
     Norm1f = np.max(np.abs(f))
     f = f/Norm1f
@@ -510,7 +558,9 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     if ift: time_max_nu += ttime.get_toc
 
     countIMFs = 0
-    stats_list = []
+    stats_list = np.recarray(opts.NIMFs,dtype=[('logM',int),('inStepN',int)])
+    stats_list.logM = 0
+    stats_list.inStepN = 0
     logM = 1 
     ### Begin Iterating ###
     while countIMFs < opts.NIMFs and k_pp >= opts.ExtPoints:
@@ -519,7 +569,7 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         
         h = f
         if 'M' not in locals() or np.size(M)<countIMFs:
-            m = get_mask_length(options,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs)
+            m = get_mask_length(opts,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs)
         else:
             m = M[countIMFs-1]
         
@@ -527,8 +577,9 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
             print('\n IMF # %1.0d   -   # Extreme points %5.0d\n' %(countIMFs,k_pp))
             print('\n  step #            SD             Mask length \n\n')
 
-        stats = AttrDictSens({'logM': [], 'inStepN': [], 'diffMaxmins_pp': []})
-        stats['logM'].append(int(m))
+        #stats = {'logM': [], 'inStepN': []}
+        #stats['logM'].append(int(m))
+        stats_list[countIMFs-1].logM = int(m)
         logM = int(m)
         
         if ift: ttime.tic 
@@ -547,7 +598,8 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         if inStepN >= opts.MaxInner:
             print('Max # of inner steps reached')
 
-        stats['inStepN'].append(inStepN)
+        #stats['inStepN'].append(inStepN)
+        stats_list[countIMFs-1].inStepN = inStepN
         
         IMF[countIMFs-1, :] = h
         
@@ -558,10 +610,11 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
         if ift: time_max_nu += ttime.get_toc
         
-        stats_list.append(stats)
+        #stats_list.append(stats)
 
     IMF = IMF[0:countIMFs, :]
     IMF = np.vstack([IMF, f[:]])
+    stats_list = stats_list[:countIMFs]
 
     IMF = IMF*Norm1f # We scale back to the original values
 

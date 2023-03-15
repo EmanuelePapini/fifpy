@@ -61,6 +61,91 @@ def convolve_high(f,a):
 #    cc=np.real(np.fft.ifft(fr*fr2))
 #
 #    return x-np.fft.fftshift(cc)
+    
+def fftconvolve1d(in1, in2, mode="same"):
+    from scipy.signal.signaltools import _init_freq_conv_axes, _centered
+    in1 = np.asarray(in1)
+    in2 = np.asarray(in2)
+
+    if in1.ndim == in2.ndim == 0:  # scalar inputs
+        return in1 * in2
+    elif in1.ndim != in2.ndim:
+        raise ValueError("in1 and in2 should have the same dimensionality")
+    elif in1.size == 0 or in2.size == 0:  # empty arrays
+        return np.array([])
+
+    in1, in2, axes = _init_freq_conv_axes(in1, in2, mode, axes,
+                                          sorted_axes=False)
+
+    s1 = in1.shape
+    s2 = in2.shape
+
+    shape = [max((s1[i], s2[i])) if i not in axes else s1[i] + s2[i] - 1
+             for i in range(in1.ndim)]
+
+    ret = _freq_domain_conv(in1, in2, axes, shape, calc_fast_len=True)
+
+    return _centered(ret, s1).copy()
+
+def _freq_domain_conv(in1, in2, axes, shape, calc_fast_len=False):
+    """Convolve two arrays in the frequency domain.
+
+    This function implements only base the FFT-related operations.
+    Specifically, it converts the signals to the frequency domain, multiplies
+    them, then converts them back to the time domain.  Calculations of axes,
+    shapes, convolution mode, etc. are implemented in higher level-functions,
+    such as `fftconvolve` and `oaconvolve`.  Those functions should be used
+    instead of this one.
+
+    Parameters
+    ----------
+    in1 : array_like
+        First input.
+    in2 : array_like
+        Second input. Should have the same number of dimensions as `in1`.
+    axes : array_like of ints
+        Axes over which to compute the FFTs.
+    shape : array_like of ints
+        The sizes of the FFTs.
+    calc_fast_len : bool, optional
+        If `True`, set each value of `shape` to the next fast FFT length.
+        Default is `False`, use `axes` as-is.
+
+    Returns
+    -------
+    out : array
+        An N-dimensional array containing the discrete linear convolution of
+        `in1` with `in2`.
+
+    """
+    from scipy import fft as sp_fft
+    if not len(axes):
+        return in1 * in2
+
+    complex_result = (in1.dtype.kind == 'c' or in2.dtype.kind == 'c')
+
+    if calc_fast_len:
+        # Speed up FFT by padding to optimal size.
+        fshape = [
+            sp_fft.next_fast_len(shape[a], not complex_result) for a in axes]
+    else:
+        fshape = shape
+
+    if not complex_result:
+        fft, ifft = sp_fft.rfftn, sp_fft.irfftn
+    else:
+        fft, ifft = sp_fft.fftn, sp_fft.ifftn
+
+    sp1 = fft(in1, fshape, axes=axes)
+    sp2 = fft(in2, fshape, axes=axes)
+
+    ret = ifft(sp1 * sp2, fshape, axes=axes)
+
+    if calc_fast_len:
+        fslice = tuple([slice(sz) for sz in shape])
+        ret = ret[fslice]
+
+    return ret
 
 def scipy_fftconvolve_high(f,a):
     from scipy.signal import fftconvolve
@@ -148,8 +233,8 @@ def get_mask_v1_1(y, k,verbose,tol):
         
     return a
 
-n=1000000
-size=10000
+n=1000
+size=200
 sigma=3
 
 from scipy.io import loadmat
