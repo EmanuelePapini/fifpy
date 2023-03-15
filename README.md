@@ -1,10 +1,23 @@
 # FAST ITERATIVE FILTERING
 
-This repository contains the python package for the Fast Iterative Filtering (FIF) and the Multivariate Fast Iterative Filtering (MvFIF) algorithm.
 
-FIF is an adaptive method for decomposing a 1D signal into a set of Intrinsic Mode Components (IMC) plus a trend. These components are simple oscillating functions whose average frequency is well behaved and form a complete and nearly orthogonal basis of the original signal.
+This repository contains the python packages for the Iterative Filtering (IF), Fast Iterative Filtering (FIF), Multidimensional Iterative Filtering (MIF), and the Multivariate Fast Iterative Filtering (MvFIF) algorithms.
+
+IF: Iterative Filtering is an adaptive method for decomposing a 1D signal into a set of Intrinsic Mode Components (IMC) plus a trend. These components are simple oscillating functions whose average frequency is well behaved and form a complete and nearly orthogonal basis of the original signal. In this repository, IF is made fast by using FFT convolution (similar to FIF but without the problem of having a periodic signal).
+
+FIF: builds on iterative filtering and combines it with FFT to make it faster. It requires, however, periodic signals
+
+MIF: it is used to decompose multidimensional signals (Currently only 2D)
+
+MvFIF: is the multivariate version of FIF, designed to decompose multichannel signals at once (e.g. vectors).
+
+Other versions (e.g. MIF multidimensional 3D or higher) may come out in the future
 
 In the package, IMFogram_v1.py contains the methods to calculate the IMFogram (see https://ui.adsabs.harvard.edu/abs/2020arXiv201114209B/abstract)
+
+### Notes ###
+This repository contains both wrappers (for FIF and MvFIF) of the original matlab code by A. Cicone and a complete rewriting (at least for the core part) for IF and MIF (the latter currently in progress).
+
 
 ### Dependencies ###
 The package has been written and tested in python3.
