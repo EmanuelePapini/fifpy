@@ -419,10 +419,6 @@ def compute_imf_fft(f,a,options):
     inStepN = 0
     SD = 1.
     
-    ker_size = len(kernel)
-    hker_size = ker_size//2
-    #kernel[hker_size] -=1 #so we get the high frequency filter 
-    
     Nh = len(h)
     while SD>delta and inStepN<MaxInner:
         inStepN += 1

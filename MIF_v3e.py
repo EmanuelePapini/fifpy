@@ -23,7 +23,7 @@ import time
 #import pandas as pd
 import timeit
 from numba import jit,njit,prange,get_num_threads,set_num_threads
-
+from attrdict import AttrDict as AttrDictSens
 __version__='3e'
 
 #WRAPPER (version unaware. To be called by IF.py) 
@@ -35,44 +35,57 @@ __version__='3e'
 ################################################################################
 ########################## AUXILIARY FUNCTIONS #################################
 ################################################################################
-class AttrDictSens(dict):
-    '''
-    A case-sensitive dictionary with access via item, attribute, and call
-    notations:
-
-        >>> d = AttrDict()
-        >>> d['Variable'] = 123
-        >>> d['Variable']
-        123
-        >>> d.Variable
-        123
-        >>> d.variable
-        123
-        >>> d('VARIABLE')
-        123
-    '''
-
-    def __init__(self, init={}):
-        dict.__init__(self, init)
-
-    def __getitem__(self, name):
-        try :
-            return super(AttrDictSens, self).__getitem__(name)
-        except:
-            raise AttributeError
-
-    def __setitem__(self, key, value):
-        return super(AttrDictSens, self).__setitem__(key, value)
-
-    __getattr__ = __getitem__
-    __setattr__ = __setitem__
-    __call__ = __getitem__
+#class AttrDictSens(dict):
+#    '''
+#    A case-sensitive dictionary with access via item, attribute, and call
+#    notations:
+#
+#        >>> d = AttrDict()
+#        >>> d['Variable'] = 123
+#        >>> d['Variable']
+#        123
+#        >>> d.Variable
+#        123
+#        >>> d.variable
+#        123
+#        >>> d('VARIABLE')
+#        123
+#    '''
+#
+#    def __init__(self, init={}):
+#        dict.__init__(self, init)
+#
+#    def __getitem__(self, name):
+#        try :
+#            return super(AttrDictSens, self).__getitem__(name)
+#        except:
+#            raise AttributeError
+#
+#    def __setitem__(self, key, value):
+#        return super(AttrDictSens, self).__setitem__(key, value)
+#
+#    __getattr__ = __getitem__
+#    __setattr__ = __setitem__
+#    __call__ = __getitem__
 
 def get_window_file_path():
     import sys
-    _path_=sys.modules[__name__].__file__[0:-12]
+    _path_=sys.modules[__name__].__file__[0:-11]
     return _path_+'/prefixed_double_filter.mat'
 
+def fftconvolve2D(f,ker, mode = 'same', BCmode = 'wrap'):
+    """
+    h_ave = fftconvolve2D(h,kernel,mode='same',BC)
+    SO FAR only mode = 'same' and BCmode = 'wrap' are implemented
+    maybe use pylab_convolve2D for direct convolution
+    """
+    if any([i<j for i,j in zip(f.shape,ker.shape)]):
+        print('error, kernel shape cannot be larger than 2D array shape')
+        return None
+    m = [i//2 for i in ker.shape]
+    kpad = np.pad(ker,((0,f.shape[0]-ker.shape[0]),(0,f.shape[1]-ker.shape[1])))
+    kpad = np.roll(kpad,(-m[0],-m[1]),(0,1))
+    return np.fft.irfft2(np.fft.rfft2(f)*np.fft.rfft2(kpad),s=f.shape) 
 
 ################################################################################
 ###################### Iterative Filtering aux functions #######################
@@ -95,7 +108,7 @@ def Maxmins(x, tol = 1e-12, mode = 'clip', method = 'zerocrossing'):
         if mode == 'clip':
             dx = np.diff(x) #naive derivative
         elif mode == 'wrap':
-            dx = np.diff(np.concatenate([x,x[:2]]) #naive derivative
+            dx = np.diff(np.concatenate([x,x[:2]])) #naive derivative
         sgns = np.diff(np.sign(dx)) #location of maxmins: max/min where sgns = -2/+2
         extrema = np.where(sgns != 0)[0]
         if len(extrema) < 1: return None
@@ -129,19 +142,19 @@ def find_max_frequency2D(f,nsamples = 1, **kwargs):
     diffMaxmins_y = []
     for i in range(nsamples):
         maxmins_x.append(Maxmins(f[kn*i,:].flatten(),**kwargs))
-        maxmins_y.append(Maxmins(f[:,km*j].flatten(),**kwargs))
+        maxmins_y.append(Maxmins(f[:,km*i].flatten(),**kwargs))
     
         diff_x = [] if len(maxmins_x[-1]) < 1 else np.diff(maxmins_x[-1])
-        diff_y = [] if len(maymins_y[-1]) < 1 else np.diff(maymins_y[-1])
-        k_pp.append([maxmins_x[-1].shape[0],maxmins_y[-1].shape[0]) 
+        diff_y = [] if len(maxmins_y[-1]) < 1 else np.diff(maxmins_y[-1])
+        k_pp.append([maxmins_x[-1].shape[0],maxmins_y[-1].shape[0]]) 
         diffMaxmins_x.append(diff_x) 
         diffMaxmins_y.append(diff_y) 
     if np.sum(k_pp) == 0.:
         print('No extrema detected')
-        return None,None,None
+        return None,None,None,None
     
     #getting maximum number of extrema detected along x and y
-    k_pp = np.array(b).squeeze().max(axis=0)
+    k_pp = np.array(k_pp).squeeze().max(axis=0)
 
     #flattening distribution of maxmins distances to be used for percentile
     #calculation (see get_mask_length
@@ -198,122 +211,42 @@ def get_mask_length2D(options,N_pp,k_pp,diffMaxmins_x,diffMaxmins_y,logM,countIM
 
     return int(mx),int(my)
 
-def get_mask_v1_1(y, k,verbose,tol):
-    """
-    Rescale the mask y so that its length becomes 2*k+1.
-    k could be an integer or not an integer.
-    y is the area under the curve for each bar
-    
-    wrapped from FIF_v2_13.m
-    
-    """
-    n = np.size(y)
-    m = (n-1)//2
-    k = int(k)
-
-    if k<=m:
-
-        if np.mod(k,1) == 0:
-            
-            a = np.zeros(2*k+1)
-            
-            for i in range(1, 2*k+2):
-                s = (i-1)*(2*m+1)/(2*k+1)+1
-                t = i*(2*m+1)/(2*k+1)
-
-                s2 = np.ceil(s) - s
-
-                t1 = t - np.floor(t)
-
-                if np.floor(t)<1:
-                    print('Ops')
-
-                a[i-1] = np.sum(y[int(np.ceil(s))-1:int(np.floor(t))]) +\
-                         s2*y[int(np.ceil(s))-1] + t1*y[int(np.floor(t))-1]
-        else:
-            new_k = int(np.floor(k))
-            extra = k - new_k
-            c = (2*m+1)/(2*new_k+1+2*extra)
-
-            a = np.zeros(2*new_k+3)
-
-            t = extra*c + 1
-            t1 = t - np.floor(t)
-
-            if k<0:
-                print('Ops')
-                a = []
-                return a
-
-            a[0] = np.sum(y[:int(np.floor(t))]) + t1*y[int(np.floor(t))-1]
-
-            for i in range(2, 2*new_k+3):
-                s = extra*c + (i-2)*c+1
-                t = extra*c + (i-1)*c
-                s2 = np.ceil(s) - s
-                t1 = t - np.floor(t)
-
-                a[i-1] = np.sum(y[int(np.ceil(s))-1:int(np.floor(t))]) +\
-                         s2*y[int(np.ceil(s))-1] + t1*y[int(np.floor(t))-1]
-            t2 = np.ceil(t) - t
-
-            a[2*new_k+2] = np.sum(y[int(np.ceil(t))-1:n]) + t2*y[int(np.ceil(t))-1]
-
-    else: # We need a filter with more points than MM, we use interpolation
-        dx = 0.01
-        # we assume that MM has a dx = 0.01, if m = 6200 it correspond to a
-        # filter of length 62*2 in the physical space
-        f = y/dx
-        dy = m*dx/k
-        # b = np.interp(list(range(1,int(m+1),m/k)), list(range(0,int(m+1))), f[m:2*m+1])
-        b = np.interp(np.linspace(0,m,int(np.ceil(k+1))), np.linspace(0,m,m+1), f[m:2*m+1])
-
-        a = np.concatenate((np.flipud(b[1:]), b))*dy
-
-        if abs(LA.norm(a,1)-1)>tol:
-            if verbose:
-                print('\n\n Warning!\n\n')
-                print(' Area under the mask equals %2.20f\n'%(LA.norm(a,1),))
-                print(' it should be equal to 1\n We rescale it using its norm 1\n\n')
-            a = a/LA.norm(a,1)
-        
-    return a
 
 
 def get_mask_2D_v3(w,k):
     """
     
-    function A=get_mask_2D_v3_ind(w,k)
+    function A=get_mask_2D_v3(w,k)
      
       get the mask with length 2*k+1 x 2*k+1
       k must be integer
       w is the area under the curve for each bar
       A  the mask with length 2*k+1 x 2*k+1
-    wrapped from FIF2_1.m
+    wrapped from FIF2_v3.m
     """
+    #check if k tuple contains integers
+    if not all([type(i) is int for i in k]):
+        print('input mask not integer, making it so')
+        k=tuple([int(i) for i in k])
 
     L=np.size(w)
     m=(L-1)/2;  #2*m+1 =L punti nel filtro
     w = np.pad(w,(0,(L-1)//2))
-    A=np.zeros((2*k+1,2*k+1))
-    #distance matrix
-    if k<=m: # The prefixed filter contains enough points
-        if np.mod(k,1)==0:   # if the mask_length is an integer
-            k=int(k)
-            dm = np.arange(-k,k+1)
-            dm = np.sqrt(dm[:,None]**2 + dm[None,:]**2)
-            s = (m-1)+L/2*dm/k
-            t = s+2
-            s2 = np.ceil(s) - s
-            t1 = t - np.floor(t)
-            for i in range(2*k+1):
-                for j in range(2*k+1):
-                    A[i,j] = np.sum(w[int(np.ceil(s[i,j]))-1:int(t[i,j])]) +\
-                             s2[i,j] * w[int(np.ceil(s[i,j]))-1] + t1[i,j]* w[int(t[i,j])-1]
-            A/=np.sum(A)
-        else:#% if the mask length is not an integer
-            print('Need to write the code!')
-            A=[]
+    A=np.zeros((2*k[0]+1,2*k[1]+1))
+    if all([i<=m for i in k]): # The prefixed filter contains enough points
+        #distance matrix
+        xx = np.arange(-k[0],k[0]+1)/k[0]
+        yy = np.arange(-k[1],k[1]+1)/k[1]
+        dm = np.sqrt(xx[:,None]**2 + yy[None,:]**2) #normalized distance from ellipse border
+        s = (m-1)+L/2*dm
+        t = s+2
+        s2 = np.ceil(s) - s
+        t1 = t - np.floor(t)
+        for i in range(2*k[0]+1):
+            for j in range(2*k[1]+1):
+                A[i,j] = np.sum(w[int(np.ceil(s[i,j]))-1:int(t[i,j])]) +\
+                         s2[i,j] * w[int(np.ceil(s[i,j]))-1] + t1[i,j]* w[int(t[i,j])-1]
+        A/=np.sum(A)
     else : #We need a filter with more points than MM, we use interpolation
         print('Need to write the code!')
         A=[]
@@ -368,9 +301,8 @@ def compute_imf_numba(f,a,options):
 
     return h_ave,inStepN,SD
 
-def compute_imf_fft(f,a,options):
+def compute_imf2d_fft(f,a,options):
         
-    from scipy.signal import fftconvolve
 
     h = np.array(f)
     h_ave = np.zeros(len(h))
@@ -379,29 +311,22 @@ def compute_imf_fft(f,a,options):
     delta = options.delta
     MaxInner = options.MaxInner
     
-        
     inStepN = 0
     SD = 1.
-    
-    ker_size = len(kernel)
-    hker_size = ker_size//2
-    #kernel[hker_size] -=1 #so we get the high frequency filter 
     
     Nh = len(h)
     while SD>delta and inStepN<MaxInner:
         inStepN += 1
-        h_ave = fftconvolve(h,kernel,mode='same')
+        h_ave = fftconvolve2D(h,kernel,mode='same', BCmode = 'wrap')
         #computing norm
         SD = LA.norm(h_ave)**2/LA.norm(h)**2
-        h[:] = h[:] - h_ave[:]
-        h_ave[:] = 0
+        h = h[...] - h_ave[...]
+        h_ave[...] = 0
         if options.verbose:
-            print('(fft): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
-    
-
+            print('(fft): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
     
     if options.verbose:
-        print('(fft): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+        print('(fft): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
 
     return h,inStepN,SD
 ################################################################################
@@ -437,7 +362,7 @@ def Settings(**kwargs):
     options['MonotoneMaskLength']=True
     options['IsotropicMask']=True
     options['NumSteps']=1
-    options['BCmode'] = 'clip' #wrap
+    options['BCmode'] = 'wrap' #'clip' #wrap
     options['Maxmins_method'] = 'zerocrossing'
     options['Maxmins_samples'] = 4
     options['imf_method'] = 'fft' #numba
@@ -479,9 +404,9 @@ def MIF_v3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
     tol = 1e-12 
 
     if opts.imf_method == 'fft': 
-        compute_imf = compute_imf2d_fft
+        compute_imf2D = compute_imf2d_fft
     elif opts.imf_method == 'numba': 
-        compute_imf = compute_imf2d_numba
+        compute_imf2D = compute_imf2d_numba
 
     #loading master filter
     ift = opts.timeit
@@ -504,8 +429,8 @@ def MIF_v3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
         raise Exception('Wrong dataset, the signal must be a 2D array!')
     
     #setting up machinery
-    N,M = f.shape
-    IMF = np.zeros([opts.NIMFs, N,M])
+    nx,ny = f.shape
+    IMF = np.zeros([opts.NIMFs, nx,ny])
     #normalizing signal such as the maximum is +-1
     Norm1f = np.max(np.abs(f))
     f = f/Norm1f
@@ -524,7 +449,7 @@ def MIF_v3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
     stats_list.inStepN = 0
     logM = (1,1) 
     ### Begin Iterating ###
-    while countIMFs < opts.NIMFs and k_pp >= opts.ExtPoints:
+    while countIMFs < opts.NIMFs and all([ii >= opts.ExtPoints for ii in k_pp]):
         countIMFs += 1
         print('IMF', countIMFs)
         
@@ -536,26 +461,26 @@ def MIF_v3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
             if type(m) is int : m = (m)*2 
 
         if opts.verbose:
-            print('\n IMF # %1.0d   -   # Extreme points %5.0d\n' %(countIMFs,k_pp))
+            print('\n IMF # %1.0d   -   # Extreme points (%s\n' %(countIMFs,k_pp))
             print('\n  step #            SD             Mask length \n\n')
 
         #stats = {'logM': [], 'inStepN': []}
         #stats['logM'].append(int(m))
         stats_list[countIMFs-1].logMx = int(m[0])
         stats_list[countIMFs-1].logMy = int(m[1])
-        logM = (int(np.min(m)))*2 if opts.IsotropicMask else m 
+        logM = (int(np.min(m)),)*2 if opts.IsotropicMask else m 
         
         if ift: ttime.tic 
-        a = get_mask_2D_v1(MM, m,opts.verbose,tol)
+        a = get_mask_2D_v3(MM, m)
         if ift: time_mask += ttime.get_toc
         #if the mask is bigger than the signal length, the decomposition ends.
-        if N < np.size(a): 
+        if any([ii< jj for ii,jj in zip(f.shape,a.shape)]): 
             if opts.verbose: print('Mask length exceeds signal length. Finishing...')
             countIMFs -= 1
             break
 
         if ift: ttime.tic 
-        h, inStepN, SD = compute_imf(h,a,opts)
+        h, inStepN, SD = compute_imf2D(h,a,opts)
         if ift: time_imfs += ttime.get_toc
         
         if inStepN >= opts.MaxInner:
@@ -564,7 +489,7 @@ def MIF_v3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
         #stats['inStepN'].append(inStepN)
         stats_list[countIMFs-1].inStepN = inStepN
         
-        IMF[countIMFs-1, :] = h
+        IMF[countIMFs-1] = h
         
         f = f - h
     
@@ -576,7 +501,7 @@ def MIF_v3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
         
 
     IMF = IMF[0:countIMFs]
-    IMF = np.vstack([IMF, f[...]])
+    IMF = np.vstack([IMF, f.reshape((1,nx,ny))])
     stats_list = stats_list[:countIMFs]
 
     IMF = IMF*Norm1f # We scale back to the original values
