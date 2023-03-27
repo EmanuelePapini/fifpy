@@ -1,6 +1,6 @@
 
 #from . import FIF_Python_v2_9 as FIFpy
-from . import FIF2_v3 as MIFpy
+from . import MIF_v3e as MIFpy
 
 import sys
 
@@ -109,8 +109,5 @@ class MIF():
         self.IMF, self.stats_list = MIFpy.MIF_run(in_f, M = M, options = self.options,window_file=window_file)
 
 
-    def FIFogram(self,*args,**kwargs):
-        
-        return FIFpy.FIFogram_py(self.IMF, *args, **kwargs)
 
 

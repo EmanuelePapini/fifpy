@@ -158,9 +158,12 @@ def find_max_frequency2D(f,nsamples = 1, **kwargs):
 
     #flattening distribution of maxmins distances to be used for percentile
     #calculation (see get_mask_length
-    diffMaxmins_x = np.array(diffMaxmins_x).flatten()
-    diffMaxmins_y = np.array(diffMaxmins_y).flatten()
+    #diffMaxmins_x = np.array(diffMaxmins_x).flatten()
+    #diffMaxmins_y = np.array(diffMaxmins_y).flatten()
+    diffMaxmins_x = np.concatenate([i.flatten() for i in diffMaxmins_x if i.size > 0])
+    diffMaxmins_y = np.concatenate([i.flatten() for i in diffMaxmins_y if i.size > 0])
     N_pp = (N,M)
+
     return N_pp, k_pp, diffMaxmins_x,diffMaxmins_y
 
 

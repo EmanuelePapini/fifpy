@@ -24,6 +24,7 @@ print('Loading FIF version: '+FIFpy.__version__)
 
 #change if you want to use a different version
 from . import MvFIF_v8 as MvFIFpy
+print('Loading MvFIF version: '+MvFIFpy.__version__)
 
 from . import fif_tools as ftools
 
