@@ -436,6 +436,85 @@ def compute_imf_fft(f,a,options):
         print('(fft): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
 
     return h,inStepN,SD
+def _compute_imf_fft_adv(f,a,options):
+    """
+    next step is doing the norm calculation in Fourier space so to reduce 
+    to only 2 FFTs
+    """
+    from scipy.signal.signaltools import _init_freq_conv_axes, _centered
+    from scipy import fft as sp_fft
+    
+    h = np.array(f)
+    h_ave = np.zeros(len(h))
+
+    kernel = a
+    delta = options.delta
+    MaxInner = options.MaxInner
+    
+        
+    inStepN = 0
+    SD = 1.
+    
+    Nh = len(h)
+    #setting machinery for fftconvolve directly wrapped from scipy.signal.signaltools
+    in1 = h; in2 = kernel
+    if in1.ndim == in2.ndim == 0:  # scalar inputs
+        return in1 * in2
+    elif in1.size == 0 or in2.size == 0:  # empty arrays
+        return np.array([])
+    in1, in2, axes = _init_freq_conv_axes(in1, in2, 'same', None,
+                                          sorted_axes=False)
+    s1 = in1.shape
+    s2 = in2.shape
+
+    shape = [max((s1[i], s2[i])) if i not in axes else s1[i] + s2[i] - 1
+             for i in range(in1.ndim)]
+    
+    calc_fast_len=True
+    if not len(axes):
+        return in1 * in2
+
+    complex_result = (in1.dtype.kind == 'c' or in2.dtype.kind == 'c')
+
+    if calc_fast_len:
+        # Speed up FFT by padding to optimal size.
+        fshape = [
+            sp_fft.next_fast_len(shape[a], not complex_result) for a in axes]
+    else:
+        fshape = shape
+
+    if not complex_result:
+        fft, ifft = sp_fft.rfftn, sp_fft.irfftn
+    else:
+        fft, ifft = sp_fft.fftn, sp_fft.ifftn
+
+    #sp1 = fft(in1, fshape, axes=axes)
+    sp2 = fft(in2, fshape, axes=axes)
+
+    
+    while SD>delta and inStepN<MaxInner:
+        inStepN += 1
+        sp1 = fft(in1, fshape, axes=axes)
+        ret = ifft(sp1 * sp2, fshape, axes=axes)
+        if calc_fast_len:
+            fslice = tuple([slice(sz) for sz in shape])
+            ret = ret[fslice]
+    
+        h_ave =  _centered(ret, s1).copy() 
+
+        #computing norm
+        SD = LA.norm(h_ave)**2/LA.norm(h)**2
+        h[:] = h[:] - h_ave[:]
+        h_ave[:] = 0
+        if options.verbose:
+            print('(fft adv): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+    
+
+    
+    if options.verbose:
+        print('(fft adv): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+
+    return h,inStepN,SD
 ################################################################################
 ###################### Iterative Filtering main functions ######################
 ################################################################################
@@ -516,6 +595,7 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
 
     if opts.imf_method == 'fft': 
         compute_imf = compute_imf_fft
+        #compute_imf = _compute_imf_fft_adv
     elif opts.imf_method == 'numba': 
         compute_imf = compute_imf_numba
 
