@@ -309,14 +309,17 @@ def compute_imf2d_fft(f,a,options):
 
     h = np.array(f)
     h_ave = np.zeros(len(h))
-
+ 
     kernel = a
     delta = options.delta
     MaxInner = options.MaxInner
     
     inStepN = 0
     SD = 1.
-    
+    #checking whether to extend the signal
+    if options.Extend and any([i<j for i,j in zip(h.shape,kernel.shape)]):
+        h = np.pad(h,(h.shape,)*2,mode='wrap')
+        print(h.shape)
     Nh = len(h)
     while SD>delta and inStepN<MaxInner:
         inStepN += 1
@@ -330,7 +333,54 @@ def compute_imf2d_fft(f,a,options):
     
     if options.verbose:
         print('(fft): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
+    if h.shape !=f.shape:
+        nx,ny = f.shape
+        h = h[nx:2*nx,ny:2*ny]
 
+    return h,inStepN,SD
+def _compute_imf2d_fft_adv(f,a,options):
+        
+    h = np.array(f)
+    h_ave = np.zeros(len(h))
+    
+    
+    ker = a
+    delta = options.delta
+    MaxInner = options.MaxInner
+    ksteps =options.NumSteps
+    
+    inStepN = 0
+    SD = 1.
+    
+    Nh = len(h)
+    if options.Extend and any([i<j for i,j in zip(h.shape,ker.shape)]):
+        h = np.pad(h,(h.shape,)*2,mode='wrap')
+    
+    if any([i<j for i,j in zip(h.shape,ker.shape)]):
+        print('error, kernel shape cannot be larger than 2D array shape')
+        return None,None,None
+    
+    m = [i//2 for i in ker.shape]
+    kpad = np.pad(ker,((0,h.shape[0]-ker.shape[0]),(0,h.shape[1]-ker.shape[1])))
+    kpad = np.roll(kpad,(-m[0],-m[1]),(0,1))
+    fkpad = np.fft.rfft2(kpad); del kpad
+    fh = np.fft.rfft2(h)
+    while SD>delta and inStepN<MaxInner:
+        inStepN += ksteps
+        fh_ave = (1-fkpad)**inStepN * fh
+        fh_avem1 = (1-fkpad)**(inStepN-1) * fh
+        SD = np.abs((np.abs(fh_ave)**2).sum()/(np.abs(fh_avem1)**2).sum() -1)
+    
+        if options.verbose:
+            print('(fft_adv): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
+    
+    if options.verbose:
+        print('(fft_adv): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
+    
+    h = np.fft.irfft2(fh_ave,s=h.shape) 
+    if h.shape !=f.shape:
+        nx,ny = f.shape
+        h = h[nx:2*nx,ny:2*ny]
     return h,inStepN,SD
 ################################################################################
 ###################### Iterative Filtering main functions ######################
@@ -364,11 +414,13 @@ def Settings(**kwargs):
     options['MaxInner']=200
     options['MonotoneMaskLength']=True
     options['IsotropicMask']=True
-    options['NumSteps']=1
+    options['NumSteps']= 4
     options['BCmode'] = 'wrap' #'clip' #wrap
     options['Maxmins_method'] = 'zerocrossing'
     options['Maxmins_samples'] = 4
     options['imf_method'] = 'fft' #numba
+    options['Extend'] = True #If true, extends the signal from nx,ny to 3nx,3ny in case a mask
+                             #bigger than nx (ny) is found
     for i in kwargs:
         if i in options.keys() : options[i] = kwargs[i] 
     return AttrDictSens(options)
@@ -408,6 +460,7 @@ def MIF_v3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
 
     if opts.imf_method == 'fft': 
         compute_imf2D = compute_imf2d_fft
+        #compute_imf2D = _compute_imf2d_fft_adv
     elif opts.imf_method == 'numba': 
         compute_imf2D = compute_imf2d_numba
 
@@ -477,11 +530,15 @@ def MIF_v3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
         a = get_mask_2D_v3(MM, m)
         if ift: time_mask += ttime.get_toc
         #if the mask is bigger than the signal length, the decomposition ends.
-        if any([ii< jj for ii,jj in zip(f.shape,a.shape)]): 
+        if any([ii< jj for ii,jj in zip(f.shape,a.shape)]) and not opts.Extend: 
             if opts.verbose: print('Mask length exceeds signal length. Finishing...')
             countIMFs -= 1
             break
-
+        elif any([3*ii< jj for 3*ii,jj in zip(f.shape,a.shape)]):
+            if opts.verbose: print('Mask length exceeds three times signal length. Finishing...')
+            countIMFs -= 1
+            break
+        
         if ift: ttime.tic 
         h, inStepN, SD = compute_imf2D(h,a,opts)
         if ift: time_imfs += ttime.get_toc
