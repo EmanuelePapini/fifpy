@@ -594,8 +594,8 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     tol = 1e-18 
 
     if opts.imf_method == 'fft': 
-        compute_imf = compute_imf_fft
-        #compute_imf = _compute_imf_fft_adv
+        #compute_imf = compute_imf_fft
+        compute_imf = _compute_imf_fft_adv
     elif opts.imf_method == 'numba': 
         compute_imf = compute_imf_numba
 

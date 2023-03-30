@@ -73,19 +73,21 @@ def get_window_file_path():
     _path_=sys.modules[__name__].__file__[0:-11]
     return _path_+'/prefixed_double_filter.mat'
 
-def fftconvolve2D(f,ker, mode = 'same', BCmode = 'wrap'):
+def fftconvolveND(f,ker, mode = 'same', BCmode = 'wrap'):
     """
     h_ave = fftconvolve2D(h,kernel,mode='same',BC)
     SO FAR only mode = 'same' and BCmode = 'wrap' are implemented
     maybe use pylab_convolve2D for direct convolution
-    """
+"""
     if any([i<j for i,j in zip(f.shape,ker.shape)]):
         print('error, kernel shape cannot be larger than 2D array shape')
         return None
-    m = [i//2 for i in ker.shape]
-    kpad = np.pad(ker,((0,f.shape[0]-ker.shape[0]),(0,f.shape[1]-ker.shape[1])))
-    kpad = np.roll(kpad,(-m[0],-m[1]),(0,1))
-    return np.fft.irfft2(np.fft.rfft2(f)*np.fft.rfft2(kpad),s=f.shape) 
+    m = tuple([-i//2 for i in ker.shape])
+    axxs = tuple([i for i in range(len(m))])
+    pads = [(0,f.shape[i]-ker.shape[i]) for i in range(len(f.shape))]
+    kpad = np.pad(ker,pads)
+    kpad = np.roll(kpad,m,axxs)
+    return np.fft.irfftn(np.fft.rfftn(f)*np.fft.rfftn(kpad),s=f.shape) 
 
 ################################################################################
 ###################### Iterative Filtering aux functions #######################
@@ -121,102 +123,96 @@ def Maxmins(x, tol = 1e-12, mode = 'clip', method = 'zerocrossing'):
     return extrema.squeeze()
    
 
-def find_max_frequency2D(f,nsamples = 1, **kwargs):
+def find_max_frequencyND(f,nsamples = 1, **kwargs):
     """
     find extrema contained in f and returns
     N_pp,k_pp,maxmins,diffMaxmins
 
-    N_pp : int, f.size
-    k_pp : int, number of extrema found
-    maxmins: array of integer (size k_pp), index (location) of extrema
-    diffMaxmins: array of integer (size k_pp -1): distance between neighbohr extrema
+    Input
+    -----
+    f: numpy ndarray 
+        input multidimensional field (2D,3D,nD)
+    
+    nsamples: int
+        number of samples per direction along which to compute the extrema.
+        Increasing this number will improve the statisticts.
+    output:
+    N_pp : int, f.shape
+    k_pp : tuple (len of f.shape), number of extrema found
+    diff_xyz: list (len of f.shape) of arrays of integer (size k_pp -1): distance between neighbohr extrema
     
     """
-    maxmins_x = []
-    maxmins_y = []
-    N,M = f.shape
-    kn = N//nsamples
-    km = M//nsamples
+    nxyz = f.shape
+    ksamples = np.array(nxyz)//nsamples
+    dims = tuple([i for i in range(len(f.shape))])
     k_pp = []
-    diffMaxmins_x = []
-    diffMaxmins_y = []
-    for i in range(nsamples):
-        maxmins_x.append(Maxmins(f[kn*i,:].flatten(),**kwargs))
-        maxmins_y.append(Maxmins(f[:,km*i].flatten(),**kwargs))
-    
-        diff_x = [] if len(maxmins_x[-1]) < 1 else np.diff(maxmins_x[-1])
-        diff_y = [] if len(maxmins_y[-1]) < 1 else np.diff(maxmins_y[-1])
-        k_pp.append([maxmins_x[-1].shape[0],maxmins_y[-1].shape[0]]) 
-        diffMaxmins_x.append(diff_x) 
-        diffMaxmins_y.append(diff_y) 
+    diffMaxmins_xyz = [[] for i in range(len(dims))]
+    maxmins_xyz = [[] for i in range(len(dims))]
+    diff_xyz = [[] for i in range(len(dims))]
+    for j in range(len(nxyz)):
+        for i in range(nsamples):
+            jdims = np.roll(dims,j)
+            jnxyz = np.roll(nxyz,j)
+            jkn = np.roll(ksamples,j)[:-1]
+            k0 = np.sum([i*jkn[idim]*np.prod(jnxyz[idim+1:]) for idim in range(len(jdims)-1)])
+            k1 = k0+nxyz[jdims[-1]]
+            ftrans = f.transpose(jdims) 
+            
+            maxmins_xyz[j].append(Maxmins( ftrans.flat[k0:k1],**kwargs))
+            if len(maxmins_xyz[j][-1]) > 1: diff_xyz[j].append(np.diff(maxmins_xyz[j][-1])) 
+        
+    k_pp = [[maxmins_xyz[j][i].shape[0] for j in range(len(nxyz))] for i in range(nsamples)]
+
     if np.sum(k_pp) == 0.:
         print('No extrema detected')
         return None,None,None,None
     
     #getting maximum number of extrema detected along x and y
-    k_pp = np.array(k_pp).squeeze().max(axis=0)
+    k_pp = np.flipud(np.array(k_pp).max(axis=0))
 
-    #flattening distribution of maxmins distances to be used for percentile
-    #calculation (see get_mask_length
-    #diffMaxmins_x = np.array(diffMaxmins_x).flatten()
-    #diffMaxmins_y = np.array(diffMaxmins_y).flatten()
-    diffMaxmins_x = np.concatenate([i.flatten() for i in diffMaxmins_x if i.size > 0])
-    diffMaxmins_y = np.concatenate([i.flatten() for i in diffMaxmins_y if i.size > 0])
-    N_pp = (N,M)
+    diff_xyz = [np.concatenate([i.flatten() for i in j if i.size > 0]) for j in diff_xyz]
+    diff_xyz.reverse()
+    N_pp = f.shape
 
-    return N_pp, k_pp, diffMaxmins_x,diffMaxmins_y
+    return N_pp, k_pp, diff_xyz
 
 
-def get_mask_length2D(options,N_pp,k_pp,diffMaxmins_x,diffMaxmins_y,logM,countIMFs):
+def get_mask_lengthND(options,N_pp,k_pp,diff_xyz,logM,countIMFs):
     #m = get_mask_length2D(opts,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs)
     
     if isinstance(options.alpha,str):
     
         if options.alpha == 'ave': 
-            mx = 2*np.round(N_pp[0]/k_pp[0]*options.Xi)
-            my = 2*np.round(N_pp[1]/k_pp[1]*options.Xi)
+            mm = [2*np.round(N_pp[i]/k_pp[i]*options.Xi) for i in range(len(N_pp))]
         elif options.alpha == 'Almost_min': 
-            mx = 2*np.min( [options.Xi*np.percentile(diffMaxmins_x,30), np.round(N_pp[0]/k_pp[0]*options.Xi)])
-            my = 2*np.min( [options.Xi*np.percentile(diffMaxmins_y,30), np.round(N_pp[1]/k_pp[1]*options.Xi)])
+            mm = [2*np.min( [options.Xi*np.percentile(diff_xyz[i],30), np.round(N_pp[i]/k_pp[i]*options.Xi)]) for i in range(len(N_pp))]
         elif options.alpha == 'Median':
-            mx = 2*np.round(np.median(diffMaxmins_x)*options.Xi)
-            my = 2*np.round(np.median(diffMaxmins_y)*options.Xi)
+            mm = [2*np.round(np.median(diff_xyz[i])*options.Xi) for i in range(len(N_pp))]
         else:    
             raise Exception('Value of alpha not recognized!\n')
     
     else:
-        mx = 2*np.round(options.Xi*np.percentile(diffMaxmins_x,options.alpha))
-        my = 2*np.round(options.Xi*np.percentile(diffMaxmins_y,options.alpha))
+        mm = [2*np.round(options.Xi*np.percentile(diffM_xyz[i],options.alpha)) for i in range(len(N_pp))]
     
     if countIMFs > 1:
-        if mx <= logM[0]:
-            if options.verbose:
-                print('Warning mask length (x) is decreasing at step %1d. ' % countIMFs)
-            if options.MonotoneMaskLength:
-                mx = np.ceil(logM[0] * 1.1)
+        for i in range(len(mm)):
+            if mm[i] <= logM[i]:
                 if options.verbose:
-                    print('The old mask length (x) is %1d whereas the new one is forced to be %1d.\n' % (
-                    logM[0], mx))
-            else:
-                if options.verbose:
-                    print('The old mask length (x) is %1d whereas the new one is %1d.\n' % (logM[0], mx))
-        if my <= logM[1]:
-            if options.verbose:
-                print('Warning mask length (y) is decreasing at step %1d. ' % countIMFs)
-            if options.MonotoneMaskLength:
-                my = np.ceil(logM[1] * 1.1)
-                if options.verbose:
-                    print('The old mask length (y) is %1d whereas the new one is forced to be %1d.\n' % (
-                    logM[1], my))
-            else:
-                if options.verbose:
-                    print('The old mask length (y) is %1d whereas the new one is %1d.\n' % (logM[1], my))
+                    print('Warning mask length (%d) is decreasing at step %1d. ' % (i,countIMFs))
+                if options.MonotoneMaskLength:
+                    mm[i] = np.ceil(logM[i] * 1.1)
+                    if options.verbose:
+                        print('The old mask length (x) is %1d whereas the new one is forced to be %1d.\n' % (
+                        logM[i], mm[i]))
+                else:
+                    if options.verbose:
+                        print('The old mask length (x) is %1d whereas the new one is %1d.\n' % (logM[i], mm[i]))
 
-    return int(mx),int(my)
+    return [int(i) for i in mm]
 
 
 
-def get_mask_2D_v3(w,k):
+def get_mask_3D_v3(w,k):
     """
     
     function A=get_mask_2D_v3(w,k)
@@ -235,20 +231,23 @@ def get_mask_2D_v3(w,k):
     L=np.size(w)
     m=(L-1)/2;  #2*m+1 =L punti nel filtro
     w = np.pad(w,(0,(L-1)//2))
-    A=np.zeros((2*k[0]+1,2*k[1]+1))
+    shapeout = tuple([2*i+1 for i in k])
+    A=np.zeros(shapeout)
     if all([i<=m for i in k]): # The prefixed filter contains enough points
         #distance matrix
         xx = np.arange(-k[0],k[0]+1)/k[0]
         yy = np.arange(-k[1],k[1]+1)/k[1]
-        dm = np.sqrt(xx[:,None]**2 + yy[None,:]**2) #normalized distance from ellipse border
+        zz = np.arange(-k[2],k[2]+1)/k[2]
+        dm = np.sqrt(xx[:,None,None]**2 + yy[None,:,None]**2 + zz[None,None,:]**2) #normalized distance from ellipse border
         s = (m-1)+L/2*dm
         t = s+2
         s2 = np.ceil(s) - s
         t1 = t - np.floor(t)
-        for i in range(2*k[0]+1):
-            for j in range(2*k[1]+1):
-                A[i,j] = np.sum(w[int(np.ceil(s[i,j]))-1:int(t[i,j])]) +\
-                         s2[i,j] * w[int(np.ceil(s[i,j]))-1] + t1[i,j]* w[int(t[i,j])-1]
+        for ix in range(2*k[0]+1):
+            for iy in range(2*k[1]+1):
+                for iz in range(2*k[2]+1):
+                    A[ix,iy,iz] = np.sum(w[int(np.ceil(s[ix,iy,iz]))-1:int(t[ix,iy,iz])]) +\
+                         s2[ix,iy,iz] * w[int(np.ceil(s[ix,iy,iz]))-1] + t1[ix,iy,iz]* w[int(t[ix,iy,iz])-1]
         A/=np.sum(A)
     else : #We need a filter with more points than MM, we use interpolation
         print('Need to write the code!')
@@ -425,7 +424,7 @@ def Settings(**kwargs):
         if i in options.keys() : options[i] = kwargs[i] 
     return AttrDictSens(options)
 
-def MIF_run(x, options=None, M = np.array([]),**kwargs):
+def MIF3D_run(x, options=None, M = np.array([]),**kwargs):
     
     if options is None:
         options = Settings()
@@ -433,7 +432,7 @@ def MIF_run(x, options=None, M = np.array([]),**kwargs):
     return MIF_v3e(x,options,M=M,**kwargs)
 
 
-def MIF_v3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthreads = None):
+def MIF3D_v3(f,options,M=np.array([]), window_file=None, data_mask = None, nthreads = None):
 
     """
     Multidimensional Iterative Filtering python implementation 
@@ -459,10 +458,10 @@ def MIF_v3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
     tol = 1e-12 
 
     if opts.imf_method == 'fft': 
-        compute_imf2D = compute_imf2d_fft
+        compute_imf3D = compute_imf2d_fft
         #compute_imf2D = _compute_imf2d_fft_adv
     elif opts.imf_method == 'numba': 
-        compute_imf2D = compute_imf2d_numba
+        compute_imf3D = compute_imf2d_numba
 
     #loading master filter
     ift = opts.timeit
