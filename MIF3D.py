@@ -70,7 +70,7 @@ __version__='3e'
 
 def get_window_file_path():
     import sys
-    _path_=sys.modules[__name__].__file__[0:-11]
+    _path_=sys.modules[__name__].__file__[0:-9]
     return _path_+'/prefixed_double_filter.mat'
 
 def fftconvolveND(f,ker, mode = 'same', BCmode = 'wrap'):
