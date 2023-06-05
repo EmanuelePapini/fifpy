@@ -18,11 +18,6 @@ import timeit
 from .IF_aux import *
 __version__='8.3e'
 
-#WRAPPER (version unaware. To be called by IF.py) 
-# def IF_run(*args,**kwargs):
-#     return IF_v8_3e(*args,**kwargs)
-
-#WRAPPER (version unaware. To be called by FIF.py) 
 
 ################################################################################
 ########################## AUXILIARY FUNCTIONS #################################
@@ -427,11 +422,13 @@ def Settings(**kwargs):
     options['BCmode'] = 'clip' #wrap
     options['Maxmins_method'] = 'zerocrossing'
     options['imf_method'] = 'fft' #numba
+    options['MaxlogM'] = None
     for i in kwargs:
         if i in options.keys() : options[i] = kwargs[i] 
     return AttrDictSens(options)
 
-def IF_run(x, options=None, M = np.array([]),**kwargs):
+#WRAPPER (version unaware. To be called by FIF_main.py) 
+def FIF_run(x, options=None, M = np.array([]),**kwargs):
     
     if options is None:
         options = Settings()
@@ -456,6 +453,7 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     data_mask : None or boolean array of size x
         used to mask data that wont be used to determine the size of the window mask (LogM).
     """
+    ssend = '\r'
     opts = AttrDictSens(options)
     if nthreads is not None:
         if opts.imf_method == 'numba': 
@@ -476,6 +474,7 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     elif opts.imf_method == 'numba': 
         compute_imf = compute_imf_numba
 
+    MaxlogM = np.size(f) if opts.MaxlogM is None else opts.MaxlogM
     #loading master filter
     ift = opts.timeit
     if ift: 
@@ -518,13 +517,23 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     ### Begin Iterating ###
     while countIMFs < opts.NIMFs and k_pp >= opts.ExtPoints:
         countIMFs += 1
-        print('IMF', countIMFs)
         
         h = f
         if 'M' not in locals() or np.size(M)<countIMFs:
             m = get_mask_length(opts,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs)
         else:
             m = M[countIMFs-1]
+        if N < 2*m+1: 
+            if opts.verbose: print('Mask length exceeds signal length. Finishing...')
+            countIMFs -= 1
+            break
+        if logM > MaxlogM:
+            if opts.verbose: print('Mask length exceeds Maximum allowed length, Finishing...')
+            countIMFs -= 1
+            break
+
+        if countIMFs ==opts.NIMFs: ssend = '\n'
+        print('IMF', countIMFs,' (%d/%d)'%(m,N), end=ssend)
         
         if opts.verbose:
             print('\n IMF # %1.0d   -   # Extreme points %5.0d\n' %(countIMFs,k_pp))
@@ -539,10 +548,6 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         a = get_mask_v1_1(MM, m,opts.verbose,tol)
         if ift: time_mask += ttime.get_toc
         #if the mask is bigger than the signal length, the decomposition ends.
-        if N < np.size(a): 
-            if opts.verbose: print('Mask length exceeds signal length. Finishing...')
-            countIMFs -= 1
-            break
 
         if ift: ttime.tic 
         h, inStepN, SD = compute_imf(h,a,opts)
@@ -570,7 +575,7 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     stats_list = stats_list[:countIMFs]
 
     IMF = IMF*Norm1f # We scale back to the original values
-
+    print('',end='\n')
     if ift: 
         ttime.total_elapsed(from_1st_start = True, hhmmss = True)
         print('imfs calculation took: %f (%.2f)' % (time_imfs,100* time_imfs / ttime._dttot)) 

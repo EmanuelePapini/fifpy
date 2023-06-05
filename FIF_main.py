@@ -26,6 +26,9 @@ print('Loading FIF version: '+FIFpy.__version__)
 from . import MvFIF_v8 as MvFIFpy
 print('Loading MvFIF version: '+MvFIFpy.__version__)
 
+from . import IF_v8_3e as IFpy
+print('Loading Fast IF version: '+IFpy.__version__)
+
 from . import fif_tools as ftools
 
 import sys
@@ -147,7 +150,8 @@ class FIF():
 
         self.data = {}
         
-        self.data['IMC'], self.data['stats_list'] = self.FIFpy.FIF_run(in_f, M = M, options = self.options,window_file=window_file,**kwargs)
+        self.data['IMC'], self.data['stats_list'] = self.FIFpy.FIF_run(in_f, M = M,\
+            options = self.options,window_file=window_file,**kwargs)
 
         self.ancillary['wshrink'] = wshrink
         
@@ -164,6 +168,8 @@ class FIF():
         """
         get instantaneous frequencies and amplitudes of the IMCs
         if as_output is true, it returns the result instead of adding it to data
+        THIS METHOD IS DEPRECATED SINCE IT DOESN'T USE wshrink.
+        PLEASE USE get_freq_amplitudes instead
         """
         
         if as_output:
@@ -273,4 +279,65 @@ class MvFIF(FIF):
         self.ancillary['get_freq_amplitudes']['use_instantaneous_freq'] = use_instantaneous_freq
         
         if as_output: return self.data['freqs'], self.data['amps']
+
+class IF(FIF):
+    """
+    Advanced class for IF decompostion.
+    It contains all the core features of the IF class plus some methods
+    to perform statistics over the computed IMCs.
+    For initialization please refer to the IF class 
+    """
+
+    def __init__(self, **kwargs):
+        """
+        initialize Iterative Filtering Class.
+        For kwargs options please look at the Settings method in IF_v8_3e.py
+        """
+
+
+        self.__version__=IFpy.__version__
+        self.options = IFpy.Settings(**kwargs)
+
+
+        self.FIFpy = IFpy
+   
+        self.ancillary = {}
+
+
+    
+    def run(self, in_f, M=np.array([]), wshrink = 0, preprocess = 'make-periodic',get_output = False,\
+            data_mask = None):
+        """
+        Parameters
+        ----------
+        preprocess : str
+            allowed values : 'make-periodic', 'extend-periodic', None
+        """
+        if preprocess == 'make-periodic':
+            print('\nmaking input signal periodic...')
+            from .arrays import make_periodic
+            
+            if wshrink == 0 : wshrink = in_f.size//4 
+            
+            in_f = make_periodic(in_f,wshrink)
+        
+        elif preprocess == 'extend-periodic':
+            print('\nextending input signal (asymmetric-periodic)...')
+
+            from .arrays import extend_signal
+            
+            if wshrink == 0 : wshrink = in_f.shape[-1]//2 
+            
+            in_f = extend_signal(in_f,wshrink) 
+            if data_mask is not None:
+                data_mask = extend_signal(data_mask,wshrink,mode='reflect')
+        else:
+            if preprocess is not None: Warning('wrong input in keyword argument preprocess. Falling back to None')
+
+        FIF.run(self,in_f, M=M, wshrink= wshrink, data_mask = data_mask)
+
+        if get_output == True:
+            return self.data['IMC'][:,wshrink:-wshrink]
+
+        
 
