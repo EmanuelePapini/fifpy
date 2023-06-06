@@ -405,6 +405,7 @@ def Settings(**kwargs):
     # General 
     #options['saveEnd'] = 0
     #options['saveInter'] = 0
+    options['stdout'] = False
     options['verbose'] = False    
     options['timeit'] = False    
     #options['plots'] = 0.0
@@ -533,7 +534,7 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
             break
 
         if countIMFs ==opts.NIMFs: ssend = '\n'
-        print('IMF', countIMFs,' (%d/%d)'%(m,N), end=ssend)
+        if opts.stdout : print('IMF', countIMFs,' (%d/%d)'%(m,N), end=ssend)
         
         if opts.verbose:
             print('\n IMF # %1.0d   -   # Extreme points %5.0d\n' %(countIMFs,k_pp))
@@ -554,7 +555,7 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         if ift: time_imfs += ttime.get_toc
         
         if inStepN >= opts.MaxInner:
-            print('Max # of inner steps reached')
+            if opts.stdout : print('Max # of inner steps reached')
 
         #stats['inStepN'].append(inStepN)
         stats_list[countIMFs-1].inStepN = inStepN
@@ -575,7 +576,7 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     stats_list = stats_list[:countIMFs]
 
     IMF = IMF*Norm1f # We scale back to the original values
-    print('',end='\n')
+    if opts.stdout : print('',end='\n')
     if ift: 
         ttime.total_elapsed(from_1st_start = True, hhmmss = True)
         print('imfs calculation took: %f (%.2f)' % (time_imfs,100* time_imfs / ttime._dttot)) 
