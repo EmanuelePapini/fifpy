@@ -23,10 +23,10 @@ else:
 print('Loading FIF version: '+FIFpy.__version__)
 
 #change if you want to use a different version
-from . import MvFIF_v8 as MvFIFpy
+from . import MvFIFpy
 print('Loading MvFIF version: '+MvFIFpy.__version__)
 
-from . import IF_v8_3e as IFpy
+from . import IFpy
 print('Loading Fast IF version: '+IFpy.__version__)
 
 from . import fif_tools as ftools
@@ -53,8 +53,7 @@ def FIF_run(*args,**kwargs):
 class FIF():
     """
     WARNING: This is an experimental version with minimal explanation.
-    Should you need help, please contact Emanuele Papini (emanuele.papini@inaf.it) or Antonio Cicone (antonio.cicone@univaq.it)
-    
+    Should you need help, please contact Emanuele Papini (emanuele.papini@inaf.it) 
 
     Python class of the Fast Iterative Filters (FIF) method  
     
@@ -285,7 +284,6 @@ class IF(FIF):
     Advanced class for IF decompostion.
     It contains all the core features of the IF class plus some methods
     to perform statistics over the computed IMCs.
-    For initialization please refer to the IF class 
     """
 
     def __init__(self, **kwargs):

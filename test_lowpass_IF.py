@@ -1,13 +1,13 @@
 
 import numpy as np
-import IF_v8_3e as itf
+import IFpy as itf
 
 n=1024
 size=3
 sigma=3
 
 from scipy.io import loadmat
-from blombly.tools import time
+from . import time
 tt=time.timeit()
 MM = loadmat('prefixed_double_filter.mat')['MM'].flatten()
 a = itf.get_mask_v1_1(MM, size,True,1e-12)

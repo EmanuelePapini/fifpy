@@ -1,6 +1,6 @@
 
 #from . import FIF_Python_v2_9 as FIFpy
-from . import MIF_v3e as MIFpy
+from . import MIFpy
 
 import sys
 

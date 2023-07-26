@@ -1,7 +1,7 @@
 import numpy as np
-import IF_v8_3e as itf
+import IFpy as itf
 import pylab as plt
-from blombly.tools import time
+from . import time
 
 profile = False
 if profile:

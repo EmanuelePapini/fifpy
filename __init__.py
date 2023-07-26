@@ -1,7 +1,7 @@
 """
  Fast Iterative Filtering python package
 
- Dependencies : numpy, scipy, numba
+ Dependencies : numpy, scipy, numba, pylab, attrdict
 
  Authors: 
     Python version: Emanuele Papini - INAF (emanuele.papini@inaf.it) 

@@ -238,7 +238,7 @@ size=200
 sigma=3
 
 from scipy.io import loadmat
-from blombly.tools import time
+from . import time
 tt=time.timeit()
 MM = loadmat('prefixed_double_filter.mat')['MM'].flatten()
 a = get_mask_v1_1(MM, size,True,1e-12)
