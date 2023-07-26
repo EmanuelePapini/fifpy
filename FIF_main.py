@@ -23,10 +23,10 @@ else:
 print('Loading FIF version: '+FIFpy.__version__)
 
 #change if you want to use a different version
-from . import MvFIFpy
+from . import MvFIF as MvFIFpy
 print('Loading MvFIF version: '+MvFIFpy.__version__)
 
-from . import IFpy
+from . import IF as IFpy
 print('Loading Fast IF version: '+IFpy.__version__)
 
 from . import fif_tools as ftools
@@ -65,7 +65,7 @@ class FIF():
         y = np.sin(2*x) + np.cos(10*x+2.3)
         
         #do the FIF analysis
-        import FIF
+        import fifpy as FIF
     
         fif=FIF.FIF()
 
@@ -303,7 +303,7 @@ class IF(FIF):
 
 
     
-    def run(self, in_f, M=np.array([]), wshrink = 0, preprocess = 'make-periodic',get_output = False,\
+    def run(self, in_f, M=np.array([]), wshrink = 0, preprocess = 'extend-periodic',get_output = False,\
             data_mask = None):
         """
         Parameters

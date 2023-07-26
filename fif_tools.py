@@ -1,12 +1,3 @@
-"""
- postprocessing tools for FIF and MvFIF
-
- Dependencies : numpy, scipy, numba
-
- Authors: 
-    Python version: Emanuele Papini - INAF (emanuele.papini@inaf.it) 
-    Original matlab version: Antonio Cicone - university of L'Aquila (antonio.cicone@univaq.it)
-"""
 import numpy as np
 from numba import jit, prange
 
@@ -54,23 +45,30 @@ def check_orthogonality(imfs,periodic=True, plot=False):
     
     if periodic :
         imfst = np.zeros( (nimf,) + tuple(np.asarray(imfs.shape[1:])+1) )
-
-        #THIS IS THE PART THAT MUST BE GENERALIZED TO ND
-        imfst[:,0:-1,0:-1] =imfs[:,:,:]
-        imfst[:,-1,0:-1] = imfs[:,-1,:]
-        imfst[:,0:-1,-1] = imfs[:,:,-1]
-        imfst[:,-1,-1] = imfs[:,0,0]
-
-
+        if ndim == 1:
+            imfst[:,0:-1] =imfs[...]
+            imfst[:,-1] = imfs[:,0]
+        elif ndim == 2:
+            #THIS IS THE PART THAT MUST BE GENERALIZED TO ND
+            imfst[:,0:-1,0:-1] =imfs[:,:,:]
+            imfst[:,-1,0:-1] = imfs[:,-1,:]
+            imfst[:,0:-1,-1] = imfs[:,:,-1]
+            imfst[:,-1,-1] = imfs[:,0,0]
+    
     else : imfst = imfs
 
+    if ndim == 1:
+        amps = np.asarray([np.sqrt(integrate(imfst[i]**2)) for i in range(nimf)])
 
-    amps = np.asarray([np.sqrt(integrate(integrate(imfst[i]**2))) for i in range(nimf)])
+        for i in range(nimf):
+            for j in range(i+1):
+                orto[i,j] = integrate(imfst[i] * imfst[j])/amps[i]/amps[j]
+    elif ndim == 2:
+        amps = np.asarray([np.sqrt(integrate(integrate(imfst[i]**2))) for i in range(nimf)])
 
-
-    for i in range(nimf):
-        for j in range(i+1):
-            orto[i,j] = integrate(integrate(imfst[i] * imfst[j]))/amps[i]/amps[j]
+        for i in range(nimf):
+            for j in range(i+1):
+                orto[i,j] = integrate(integrate(imfst[i] * imfst[j]))/amps[i]/amps[j]
 
 
     if plot:
@@ -85,11 +83,6 @@ def check_orthogonality(imfs,periodic=True, plot=False):
                 plt.xlabel(r'$j$',fontsize=14)
                 plt.ylabel(r'$i$',fontsize=14)
                 plt.title(r'$\langle \mathrm{IMF}_i,\mathrm{IMF}_j\rangle $')
-
-
-
-
-
 
     return orto
 
@@ -106,14 +99,177 @@ def orthogonalize(imfs,threshold = 0.6, **kwargs):
     imfst = imfs
     while lowdiag.max() >= threshold:
         i = lowdiag.argmax()
-        imt = imfst[i,...]
-        imfst = np.concatenate((imfst[0:i,...],imfst[i+1:,...]),axis=0)
-        imfst[i-1,:,:] += imt
+        imt = imfst[i+1,...]
+        imfst = np.concatenate((imfst[0:i+1,...],imfst[i+2:,...]),axis=0)
+        imfst[i,...] += imt
         orto =check_orthogonality(imfst,**kwargs)
         ilow = np.arange(imfst.shape[0]-1)+1
         lowdiag = orto[ilow,ilow-1]
          
     return imfst
+
+##### SPECIFIC MvFIF tools #####
+def check_orthogonality_MvFIF(imfs,periodic=True, plot=False,only_nearest = False):
+    """
+    WORKS ONLY FOR 1D multichannel IMCs as given in output by MvFIF
+
+    """
+    from scipy.integrate import trapz as integrate
+
+    ndim = len(imfs.shape[2:])
+
+    nimf=imfs.shape[0]
+    nchan = imfs.shape[1]
+    
+    if periodic :
+        imfst = np.zeros( (nimf,nchan) + tuple(np.asarray(imfs.shape[2:])+1) )
+        if ndim == 1:
+            imfst[:,:,0:-1] =imfs[...]
+            imfst[:,:,-1] = imfs[:,:,0]
+        elif ndim == 2:
+            #THIS IS THE PART THAT MUST BE GENERALIZED TO ND
+            imfst[:,:,0:-1,0:-1] =imfs[:,:,:,:]
+            imfst[:,:,-1,0:-1] = imfs[:,:,-1,:]
+            imfst[:,:,0:-1,-1] = imfs[:,:,:,-1]
+            imfst[:,:,-1,-1] = imfs[:,:,0,0]
+    
+    else : imfst = imfs
+
+    if ndim == 1:
+        amps = np.asarray([np.sqrt(integrate(imfst[i]**2)) for i in range(nimf)])
+
+        if only_nearest:
+            orto = np.zeros([nimf-1,nchan])
+            for i in range(nimf-1):
+                j = i+1
+                ints = integrate(imfst[i] * imfst[j])
+                orto[i] = ints/amps[i]/amps[j]
+        else:
+            orto = np.zeros([nimf,nimf,nchan])
+
+            for i in range(nimf):
+                for j in range(i+1):
+                    ints = integrate(imfst[i] * imfst[j])
+                    orto[i,j] = ints/amps[i]/amps[j]
+        
+        orto = orto.max(axis=-1)
+    
+    elif ndim == 2:
+        raise Exception('NOT IMPLEMENTED FOR 2D SIGNALS')
+        amps = np.asarray([np.sqrt(integrate(integrate(imfst[i]**2))) for i in range(nimf)])
+
+        for i in range(nimf):
+            for j in range(i+1):
+                orto[i,j] = integrate(integrate(imfst[i] * imfst[j]))/amps[i]/amps[j]
+
+
+    if plot:
+        import pylab as plt
+        from matplotlib import cm
+        plt.ion()
+        plt.figure(figsize=(7,5.67))
+        plt.imshow(orto,cmap=cm.Blues, extent=[0.5,nimf+.5,nimf+.5,0.5])
+        for j in range(nimf):
+            for i in range(j+1):
+                plt.text(i+1,j+1,'{:.2f}'.format( np.abs(orto[j,i])),ha='center',va='center',fontsize=11,color='darkorange')
+                plt.xlabel(r'$j$',fontsize=14)
+                plt.ylabel(r'$i$',fontsize=14)
+                plt.title(r'$\langle \mathrm{IMF}_i,\mathrm{IMF}_j\rangle $')
+
+    return orto
+
+def orthogonalize_MvFIF(imfs,threshold = 0.6, only_nearest = True, **kwargs):
+    """
+    TESTED ONLY FOR 1D multichannel IMCS. 
+
+    """
+
+    orto =check_orthogonality_MvFIF(imfs,only_nearest = only_nearest, **kwargs)
+    ilow = np.arange(imfs.shape[0]-1)+1
+    lowdiag = orto if only_nearest else orto[ilow,ilow-1]
+    imfst = imfs
+    jjj=0
+    while lowdiag.max() >= threshold:
+        #print(jjj)
+        #jjj+=1
+        #print(imfst.shape)
+        i = lowdiag.argmax()
+        imt = imfst[i+1,...]
+        imfst = np.concatenate((imfst[0:i+1,...],imfst[i+2:,...]),axis=0)
+        imfst[i,...] += imt
+        orto =check_orthogonality_MvFIF(imfst,only_nearest = only_nearest,**kwargs)
+        ilow = np.arange(imfst.shape[0]-1)+1
+        lowdiag = orto if only_nearest else orto[ilow,ilow-1]
+         
+    return imfst
+
+#def _postprocessing_IMF(IMF,eps = 1e-3):
+#    """
+#    %
+#    % postprocessing of the IMF
+#    %  INPUT:
+#    %       IMF : intrinsic mode functions as returned by MIF
+#    %       epsi: threshold parameter: if the difference between the average
+#    %             frequency of two IMFs falls below epsi, then sum the two IMFS
+#    %             into one only IMF.
+#    %
+#    %  OUTPUT:
+#    %
+#    %   IMF_pp: new processed IMFs (maybe less than the original imfs)
+#    %   fim_pp: averaged frequencies of each IMF
+#    %
+#    """
+#
+#    if len(IMF.shape) == 3:
+#        IMF_pp = []
+#        frq_pp = []
+#        for i in range(IMF.shape[0]):
+#            IMF_ppx,frq_ppx = _postprocessing_IMF(IMF[i,...].squeeze(),eps =eps)
+#            IMF_pp.append(IMF_ppx)
+#            frq_pp.append(frq_ppx)
+#        return IMF_pp, frq_pp
+#    else:
+#        N0 = len(IMF[0,:])
+#        M0 = len(IMF[:,0])
+#        fim0 = np.zeros(M0)
+#        for i in range(M0):
+#            maxmins = Maxmins_v3_6(IMF[i,:])
+#            fim0[i]=1/(2*np.round(N0/len(maxmins)))
+#        
+#        IMF_pp=[IMF[0,:].copy()]
+#        fim_pp=[fim0[0]]
+#        for i in range(1,M0):
+#            if (np.abs(fim0[i]-fim0[i-1]) < eps ) :
+#                IMF_pp[-1] += IMF[i,:]
+#            else:
+#                IMF_pp.append(IMF[i,:].copy())
+#                fim_pp.append(fim0[i])
+#        
+#        #IMF_pp.append(IMF[-1,:])
+#        #fim_pp.append(fim0[-1])
+#        return np.array(IMF_pp), np.array(fim_pp)
+
+
+#def IMC_get_freq_amplitude(IMF,dx = 1,eps = 0):
+#
+#
+#    try:
+#        imf_pp,fim_pp = _postprocessing_IMF(IMF,eps)
+#    except:
+#        print("error during frequency calculation, skipping computing frequencies")
+#        freq=-1
+#    else:
+#        nimfs,nx = IMF.shape
+#         
+#        freq=np.asarray(fim_pp)/dx
+#    
+#    amp0 = np.sqrt(integrate(imf_pp**2)*dx)  
+#
+#    if np.shape(IMF) == np.shape(imf_pp):
+#        return freq,amp0 
+#    else :
+#        return freq,amp0,imf_pp
+
 
 
 def IMC_get_freq_amp(IMF, dt = 1, resort = False, wshrink = 0, use_instantaneous_freq = True):
@@ -160,7 +316,7 @@ def IMC_get_inst_freq_amp(IMF,dt):
 
     """
     fs = 1/dt #sampling frequency
-    M0, N0 = np.shape(IMF)
+    M0, N0 = np.shape(IMF)  #M0 = nimf, N0 = nt
 
     #arrays of inst. freqs and amplitudes
     IMF_iA = np.zeros((M0,N0))
@@ -168,6 +324,8 @@ def IMC_get_inst_freq_amp(IMF,dt):
     
     min_iF = np.zeros(M0) 
     max_iF = np.zeros(M0) 
+   
+    zci = lambda v: np.find(np.diff(np.sign(v)))
     
     for i in range(M0):
         
