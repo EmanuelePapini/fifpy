@@ -40,7 +40,7 @@ def raised_cosine(n, endpoint = False):
     return (-np.cos(x) +1)/2
 
 
-def extend_signal(sig,npad, mode = 'asymw-periodic',**kwargs):
+def extend_signal(sig,npad, mode = 'asymw-periodic',npad_raisedcos = None,**kwargs):
 
     """
     wrapper for numpy.pad
@@ -49,6 +49,9 @@ def extend_signal(sig,npad, mode = 'asymw-periodic',**kwargs):
 
     Parameters
     ----------
+    
+    npad : int or sequence of ints
+        number of points (left and right) to use for the extension
 
     mode : str (default is 'constant')
         method of extension/padding.
@@ -66,7 +69,13 @@ def extend_signal(sig,npad, mode = 'asymw-periodic',**kwargs):
         array([4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 8, 7, 6, 5])
         >>>wextend(a,4,mode = 'asymw')
         array([-4, -3, -2, -1,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12,13])
+    
+    npad_raisedcos : int or sequence of ints or None
+        number of points (from left and right boundary) where to apply the raised cosine.
+        If None, then npad = npad_raisedcos 
     """
+
+    npad_rs = npad_raisedcos if npad_raisedcos is not None else npad
 
     if mode.lower() == 'symw':
         
@@ -84,22 +93,24 @@ def extend_signal(sig,npad, mode = 'asymw-periodic',**kwargs):
         if len(shape) == 1:
             mean = np.mean(new_sig)
         
-            rs = raised_cosine(npad,endpoint=True)
+            rs = raised_cosine(npad_rs,endpoint=True)
         
-            new_sig[0:npad] = (new_sig[0:npad] - mean)*rs +mean
-            new_sig[-npad:] = (new_sig[-npad:] - mean)*np.flip(rs) + mean
+            new_sig[0:npad_rs] = (new_sig[0:npad_rs] - mean)*rs +mean
+            new_sig[-npad_rs:] = (new_sig[-npad_rs:] - mean)*np.flip(rs) + mean
        
         else:
             new_sig=new_sig.reshape( (np.prod(newshape[0:-1]),newshape[-1]) )
             
             mean = np.mean(new_sig,axis=-1) 
             
-            rsl = raised_cosine(npad[-1][0])
-            rsr = np.flip(raised_cosine(npad[-1][-1]))
+            rsl = raised_cosine(npad_rs[-1][0])
+            rsr = np.flip(raised_cosine(npad_rs[-1][-1]))
             
             for i in range(new_sig.shape[0]): 
-                new_sig[i,0:npad[-1][0]] = (new_sig[i,0:npad[-1][0]] - mean[i])*rsl +mean[i]
-                new_sig[i,-npad[-1][-1]:] = (new_sig[i,-npad[-1][-1]:] - mean[i])*rsr + mean[i]
+                new_sig[i,0:npad_rs[-1][0]] = (new_sig[i,0:npad_rs[-1][0]] \
+                                                - mean[i])*rsl +mean[i]
+                new_sig[i,-npad_rs[-1][-1]:] = (new_sig[i,-npad_rs[-1][-1]:] \
+                                                - mean[i])*rsr + mean[i]
 
             new_sig.reshape(newshape)
 

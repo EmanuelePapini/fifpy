@@ -1,5 +1,5 @@
 import numpy as np
-from . import IFpy as itf
+from . import IF 
 import pylab as plt
 from . import time
 
@@ -19,18 +19,20 @@ y2 = np.sin(2*x)
 y1 = np.cos(10*x+2.3)
 y = np.sin(2*x) + np.cos(10*x+2.3)
 
-opts = itf.Settings(verbose=True,Xi=2.0)
+fif = IF(verbose=True,Xi=2.0,ExtPoints=9)
 if profile:
-    timeit.tic; cProfile.run("IMF,stats = itf.IF_v8_3e(y,opts)",'IF_profiled'); timeit.toc
+    timeit.tic; cProfile.run("fif.run(y)",'IF_profiled'); timeit.toc
 else:
-    timeit.tic; IMF,stats = itf.IF_v8_3e(y,opts); timeit.toc
+    timeit.tic; fif.run(y); timeit.toc
 #y = np.zeros(n)
 #
 #y[n//2] = 1
 #y[n//2+size//2] = 4
 #y[n-3] = 1
 #(convhigh,SD) = convolve_high(y,a)
-fig,ax = plt.subplots(4)
+IMF = fif.IMC
+
+fig,ax = plt.subplots(IMF.shape[0]+1)
 ax[0].plot(y)
 for i in range(IMF.shape[0]):
     ax[i+1].plot(IMF[i])

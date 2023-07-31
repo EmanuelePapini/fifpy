@@ -23,10 +23,10 @@ else:
 print('Loading FIF version: '+FIFpy.__version__)
 
 #change if you want to use a different version
-from . import MvFIF as MvFIFpy
+from . import MvFIFpy
 print('Loading MvFIF version: '+MvFIFpy.__version__)
 
-from . import IF as IFpy
+from . import IFpy
 print('Loading Fast IF version: '+IFpy.__version__)
 
 from . import fif_tools as ftools
@@ -304,7 +304,7 @@ class IF(FIF):
 
     
     def run(self, in_f, M=np.array([]), wshrink = 0, preprocess = 'extend-periodic',get_output = False,\
-            data_mask = None):
+            data_mask = None,npad_raisedcos = None):
         """
         Parameters
         ----------
@@ -326,7 +326,7 @@ class IF(FIF):
             
             if wshrink == 0 : wshrink = in_f.shape[-1]//2 
             
-            in_f = extend_signal(in_f,wshrink) 
+            in_f = extend_signal(in_f,wshrink,npad_raisedcos = npad_raisedcos) 
             if data_mask is not None:
                 data_mask = extend_signal(data_mask,wshrink,mode='reflect')
         else:
