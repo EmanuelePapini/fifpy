@@ -161,7 +161,7 @@ def MvIF(f,options,M=np.array([]), window_file=None, data_mask = None, nthreads 
     ### Begin Iterating ###
     while countIMFs < opts.NIMFs and k_pp >= opts.ExtPoints:
         countIMFs += 1
-        print('IMF', countIMFs)
+        #print('IMF', countIMFs)
         
         h = f
         if 'M' not in locals() or np.size(M)<countIMFs:

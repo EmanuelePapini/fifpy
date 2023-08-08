@@ -41,6 +41,7 @@ def Settings(**kwargs):
     # General 
     #options['saveEnd'] = 0
     #options['saveInter'] = 0
+    options['silent'] = False    
     options['verbose'] = False    
     options['timeit'] = False    
     #options['plots'] = 0.0
@@ -90,6 +91,7 @@ def MvIF(in_f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
         TO BE IMPLEMENTED
     """
     opts = AttrDictSens(options)
+    silent = opts.silent
     if nthreads is not None:
         if opts.imf_method == 'numba': 
             set_num_threads(nthreads)
@@ -109,7 +111,7 @@ def MvIF(in_f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
         compute_imf = compute_imf_numba
 
     if opts.MaskLengthType == 'amp': 
-        print('using amplitude to calculate mask')
+        if not silent: print('using amplitude to calculate mask')
         tol = 1e-18
     #loading master filter
     ift = opts.timeit
@@ -161,7 +163,7 @@ def MvIF(in_f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
     ### Begin Iterating ###
     while countIMFs < opts.NIMFs and k_pp >= opts.ExtPoints:
         countIMFs += 1
-        print('IMF', countIMFs)
+        if not silent: print('IMF', countIMFs)
         
         h = np.copy(f)
         if 'M' not in locals() or np.size(M)<countIMFs:
@@ -196,7 +198,7 @@ def MvIF(in_f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
         if ift: time_imfs += ttime.get_toc
         
         if inStepN >= opts.MaxInner:
-            print('Max # of inner steps reached')
+            if not silent: print('Max # of inner steps reached')
 
         #stats['inStepN'].append(inStepN)
         stats_list[countIMFs-1].inStepN = inStepN

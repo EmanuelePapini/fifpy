@@ -217,6 +217,10 @@ class MvFIF(FIF):
    
         #contains ancillary data which keep trace of the processing done on the data
         self.ancillary = {}
+    
+    @property
+    def IMC(self):
+        return self.data['IMC'][:,:,self.wsh:-self.wsh] if self.wsh >0 else self.data['IMC'] 
 
 
     def get_inst_freq_amp(self,dt, as_output = False ):
@@ -250,15 +254,31 @@ class MvFIF(FIF):
                 
         """
         wsh = self.ancillary['wshrink']
-
-        self.data['freqs'], self.data['amps'] = ftools.IMC_get_freq_amp(np.squeeze(self.data['IMC'][:,0,:]), \
+        
+        nimf,ndim,nt = self.data['IMC'].shape
+        freqs = np.zeros((ndim,nimf))
+        amps = np.zeros((ndim,nimf))
+        for i in range(ndim):
+            freqt,ampt = ftools.IMC_get_freq_amp(self.data['IMC'][:,i,:], \
                      use_instantaneous_freq = use_instantaneous_freq, wshrink = wsh, \
                      **kwargs)
-
+            freqs[i] = freqt
+            amps[i] = ampt
+        self.data['freqs'] = freqs 
+        self.data['amps'] = amps
         self.ancillary['get_freq_amplitudes'] = kwargs
         self.ancillary['get_freq_amplitudes']['use_instantaneous_freq'] = use_instantaneous_freq
         
         if as_output: return self.data['freqs'], self.data['amps']
+
+    def orthogonalize(self,threshold = 0.6, only_nearest = True, **kwargs):
+        
+        if self.data['IMC'].shape[0] <3: #if shape==2 then only one imf was extracted
+            return
+        IMCs = self.data['IMC']
+        imfs = ftools.orthogonalize_MvFIF(IMCs,threshold, only_nearest, **kwargs)
+        self.ancillary['orthogonalized'] = True
+        self.data['IMC'] = imfs
 
 class IF(FIF):
     """
@@ -350,9 +370,10 @@ class MvIF(MvFIF):
         preprocess : str
             allowed values : 'make-periodic', 'extend-periodic', None
         """
+        silent = self.options['silent']
         D,N = np.shape(in_f)
         if preprocess == 'make-periodic':
-            print('\nmaking input signal periodic...')
+            if not silent: print('\nmaking input signal periodic...')
             from .arrays import make_periodic
             
             if wshrink == 0 : wshrink = in_f.size//4 
@@ -361,7 +382,7 @@ class MvIF(MvFIF):
             for iD in range(D):    
                 out_f[iD] = make_periodic(in_f[iD],wshrink)
         elif preprocess == 'extend-periodic':
-            print('\nextending input signal (asymmetric-periodic)...')
+            if not silent: print('\nextending input signal (asymmetric-periodic)...')
 
             from .arrays import extend_signal
             
@@ -371,7 +392,7 @@ class MvIF(MvFIF):
             out_f = np.zeros((D,ff.size))
             out_f[0] = ff
             for iD in range(1,D):
-                out_f[iD] = extend_signal(in_f[i],wshrink,npad_raisedcos = npad_raisedcos) 
+                out_f[iD] = extend_signal(in_f[iD],wshrink,npad_raisedcos = npad_raisedcos) 
 
             if data_mask is not None:
                 data_mask = extend_signal(data_mask,wshrink,mode='reflect')
