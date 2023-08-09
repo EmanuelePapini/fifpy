@@ -437,7 +437,7 @@ def FIF_run(x, options=None, M = np.array([]),**kwargs):
     return IF_v8_3e(x,options,M=M,**kwargs)
 
 
-def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthreads = None):
+def IF_v8_3e(f,options,M=np.array([]), window_mask=None, data_mask = None, nthreads = None):
 
     """
     Iterative Filtering python implementation (version 8) Parallel version
@@ -486,12 +486,8 @@ def IF_v8_3e(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         time_mask = 0.
         ttime.tic
 
-    if window_file is None:
-        window_file = get_window_file_path()
-    try:
-        MM = loadmat(window_file)['MM'].flatten()
-    except:
-        raise ValueError("ERROR! Could not load window function from file: "+window_file)
+    if window_mask is None:
+        MM = FKmask #get_window_file_path()
     f = np.asarray(f)
     if len(f.shape) > 1: 
         raise Exception('Wrong dataset, the signal must be a 1D array!')

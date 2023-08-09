@@ -24,8 +24,12 @@ class MIF():
 
         #create the signal to be analyzed
         import numpy as np
-        x = np.linspace(0,2*np.pi,100,endpoint=False)
-        y = np.sin(2*x) + np.cos(10*x+2.3)
+        n=512
+
+        x = np.linspace(0,6*np.pi,n,endpoint=False)
+        y2 = np.sin(2*x[:,None])*np.cos(2*x[None,:]+0.2) 
+        y1 = np.cos(10*x[:,None]+2.3)*np.sin(11*x[None,:])
+        y = y1+y2
         
         #do the MIF analysis
         import MIF

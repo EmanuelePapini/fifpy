@@ -13,7 +13,7 @@ from numpy import linalg as LA
 from scipy.io import loadmat
 from scipy.signal import argrelextrema 
 from numba import jit,njit
-
+from .IF_aux import FKmask
 __version__='8.0'
 
 
@@ -115,7 +115,7 @@ def get_mask_v1_1(y, k):
 
 
 
-def MvFIF(x, delta, alpha, NumSteps, ExtPoints, NIMFs, MaxInner, Xi=1.6, M=np.array([]), MonotoneMaskLength=True, verbose=False,window_file='prefixed_double_filter.mat',fft='pyfftw',threads=None):
+def MvFIF(x, delta, alpha, NumSteps, ExtPoints, NIMFs, MaxInner, Xi=1.6, M=np.array([]), MonotoneMaskLength=True, verbose=False,window_mask=None,fft='pyfftw',threads=None):
     """
     MultiVariate Fast Iterative Filtering python implementation (version 8)
     adapted from MvFIF_v8.m
@@ -153,7 +153,7 @@ def MvFIF(x, delta, alpha, NumSteps, ExtPoints, NIMFs, MaxInner, Xi=1.6, M=np.ar
     ###############################################################
     #                   Iterative Filtering                       #
     ###############################################################
-    MM = loadmat(window_file)['MM'].flatten()
+    MM = FKmask if window_mask is None else window_mask
 
     ### Create a signal without zero regions and compute the number of extrema ###
     g = normc(f)

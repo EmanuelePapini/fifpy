@@ -1,13 +1,14 @@
 import os
 import numpy as np
 from numpy import linalg as LA
-from scipy.io import loadmat
+#from scipy.io import loadmat
 from scipy.signal import argrelextrema 
 from numpy import fft
 import time
 #import pandas as pd
 import timeit
 from numba import jit
+from .IF_aux import FKmask
 
 __version__='2.13'
 
@@ -209,13 +210,15 @@ def FIF_run(x, options=None, M = np.array([]),**kwargs):
     
     return FIF_v2_13(x,options,M=M,**kwargs)
 
-def FIF_v2_13(f,options,M=np.array([]),window_file=None):
+def FIF_v2_13(f,options,M=np.array([]),window_mask=None):
    
  
     tol = 1e-12 
 
-    if window_file is None:
-        window_file = get_window_file_path()
+    #if window_file is None:
+    #    window_file = get_window_file_path()
+    
+    window_mask = FKmask if window_mask is None else window_mask
 
 
     f = np.asarray(f)
@@ -230,7 +233,7 @@ def FIF_v2_13(f,options,M=np.array([]),window_file=None):
     ###############################################################
     #                   Iterative Filtering                       #
     ###############################################################
-    MM = loadmat(window_file)['MM'].flatten()
+    MM = window_mask #loadmat(window_file)['MM'].flatten()
 
     ### Create a signal without zero regions and compute the number of extrema ###
     f_pp = np.delete(f, np.argwhere(abs(f)<=tol))

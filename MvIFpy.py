@@ -72,7 +72,7 @@ def FIF_run(x, options=None, M = np.array([]),**kwargs):
     return MvIF(x,options,M=M,**kwargs)
 
 
-def MvIF(in_f,options,M=np.array([]), window_file=None, data_mask = None, nthreads = None):
+def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthreads = None):
 
     """
     Iterative Filtering python implementation (version 8) Parallel version
@@ -123,12 +123,7 @@ def MvIF(in_f,options,M=np.array([]), window_file=None, data_mask = None, nthrea
         time_mask = 0.
         ttime.tic
 
-    if window_file is None:
-        window_file = get_window_file_path()
-    try:
-        MM = loadmat(window_file)['MM'].flatten()
-    except:
-        raise ValueError("ERROR! Could not load window function from file: "+window_file)
+    MM = FKmask if window_mask is None else window_mask
     f = np.copy(in_f)
     if len(f.shape) > 2: 
         raise Exception('Wrong dataset, the signal must be a 2D array!')

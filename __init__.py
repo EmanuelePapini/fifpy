@@ -20,12 +20,14 @@ from . import FIF_v2_13 as FIFpy
 from . import MvFIFpy
 from . import IFpy
 from . import MvIFpy
+from . import MIFpy
 
-
-__version__ = ('FIF:'+FIFpy.__version__,'MvFIF:'+MvFIFpy.__version__,'IF:'+IFpy.__version__,'MvIF:'+MvIFpy.__version__)
+__version__ = ('FIF:'+FIFpy.__version__,'MvFIF:'+MvFIFpy.__version__,\
+               'IF:'+IFpy.__version__,'MvIF:'+MvIFpy.__version__,\
+               'MIF:'+MIFpy.__version__)
 
 _path_=sys.modules[__name__].__file__[0:-11]
-window_file = _path_+'prefixed_double_filter.mat'
+#window_file = _path_+'prefixed_double_filter.mat'
 
 
 
@@ -131,7 +133,7 @@ class FIF():
         self.data = {}
         
         self.data['IMC'], self.data['stats_list'] = self.FIFpy.FIF_run(in_f, M = M,\
-            options = self.options,window_file=window_file,**kwargs)
+            options = self.options,**kwargs)
 
         self.ancillary['wshrink'] = wshrink
         
@@ -405,4 +407,105 @@ class MvIF(MvFIF):
 
         if get_output == True:
             return self.data['IMC'][:,wshrink:-wshrink]
+
+class MIF():
+    """
+    python class of the Multidimensional Iterative Filtering (MIF) method  
+    
+    Calling sequence example
+
+        #create the signal to be analyzed
+        import numpy as np
+        n=512
+
+        x = np.linspace(0,6*np.pi,n,endpoint=False)
+        y2 = np.sin(2*x[:,None])*np.cos(2*x[None,:]+0.2) 
+        y1 = np.cos(10*x[:,None]+2.3)*np.sin(11*x[None,:])
+        y = y1+y2
+        
+        #do the MIF analysis
+        import MIF
+    
+        mif_object=MIF.MIF()
+
+        mif_object.run(y)
+
+        #plot the results
+        import pylab as plt
+        plt.ion()
+        plt.figure()
+        plt.plot(x,y,label='signal')
+        [plt.plot(x,mif_object.IMF[i,:],label = 'IMF#'+i.str()) for i in range(a.IMF.shape[0])]
+        plt.legend(loc='best')
+
+    Eventual custom settings (e.g. Xi, delta and so on) must be specified at the time of initialization
+    (see __init__ below)
+
+    % It generates the decomposition of the signal f :
+    %
+    %  f = IMF(1,:) + IMF(2,:) + ... + IMF(K, :)
+    %
+    % where the last row in the matrix IMF is the trend and the other rows
+    % are actual IMFs
+    %
+    %                                Inputs
+    %
+    %   f         Signal to be decomposed
+    %
+    %
+    %   M         Mask length values for each Inner Loop
+    %
+    %                               Output
+    %
+    %   IMF       Matrices containg in row i the i-th IMF. The last row
+    %              contains the remainder-trend.
+    %
+    %   logM      Mask length values used for each IMF
+    %
+    %   See also SETTINGS_IF_V1, GETMASK_V1, MAXMINS_v3_4, PLOT_IMF_V8.
+    %
+    %  Ref: A. Cicone, J. Liu, H. Zhou. 'Adaptive Local Iterative Filtering for 
+    %  Signal Decomposition and Instantaneous Frequency analysis'. Applied and 
+    %  Computational Harmonic Analysis, Volume 41, Issue 2, September 2016, 
+    %  Pages 384-411. doi:10.1016/j.acha.2016.03.001
+    %  ArXiv http://arxiv.org/abs/1411.6051
+    %
+    %  A. Cicone. 'Nonstationary signal decomposition for dummies'. 
+    %  Chapter in the book: Advances in Mathematical Methods and High 
+    %  Performance Computing. Springer, 2019
+    %  ArXiv https://arxiv.org/abs/1710.04844
+    %
+    %  A. Cicone, H. Zhou. 'Numerical Analysis for Iterative Filtering with 
+    %  New Efficient Implementations Based on FFT'
+    %  ArXiv http://arxiv.org/abs/1802.01359
+    %
+    """
+
+    def __init__(self, **kwargs):
+        """
+        initialize Iterative Filtering Class.
+        For kwargs options please look at the Settings method in IF_v8_3e.py
+        """
+
+
+        self.options = MIFpy.Settings(**kwargs)
+
+        self.FIFpy = MIFpy
+   
+        self.ancillary = {}
+
+
+    def run(self, in_f, M=np.array([]),**kwargs):
+
+        self.data = {}
+        
+        self.data['IMC'], self.data['stats_list'] = self.FIFpy.FIF_run(in_f, M = M,\
+            options = self.options,**kwargs)
+
+    @property
+    def input_field(self):
+        return np.sum(self.data['IMC'],axis=0)
+    @property
+    def IMC(self):
+        return self.data['IMC']#[:,self.wsh:-self.wsh] if self.wsh >0 else self.data['IMC'] 
 
