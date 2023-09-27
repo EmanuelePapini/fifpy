@@ -21,6 +21,7 @@ from numba import jit,njit,prange,get_num_threads,set_num_threads
 from attrdict import AttrDict as AttrDictSens
 
 from .prefixed_double_filter import MM as FKmask
+FKmask = np.array(FKmask)
 
 def get_window_file_path():
     """
