@@ -394,8 +394,8 @@ def find_max_frequency2D(f,nsamples = 1, **kwargs):
     
     """
     from random import randrange
-    maxmins_x = []
-    maxmins_y = []
+    #maxmins_x = []
+    #maxmins_y = []
     N,M = f.shape
     kn = N//nsamples
     km = M//nsamples
@@ -406,19 +406,20 @@ def find_max_frequency2D(f,nsamples = 1, **kwargs):
         
         #this is to avoid that None are produced
         for ix in range(kn):
-            mxms = Maxmins(f[randrange(N),:].flatten(),**kwargs)
-            if mxms is not None: break
-        maxmins_x.append(mxms)
-        del mxms
+            maxmins_x = Maxmins(f[randrange(N),:].flatten(),**kwargs)
+            if maxmins_x is not None: break
+        #maxmins_x.append(mxms)
+        #del mxms
         for iy in range(km):
-            mxms = Maxmins(f[:,randrange(M)].flatten(),**kwargs)
-            if mxms is not None: break
-        maxmins_y.append(mxms)
-        del mxms
-        if maxmins_x[-1] is not None and maxmins_y[-1] is not None:
-            diff_x = [] if len(maxmins_x[-1]) < 1 else np.diff(maxmins_x[-1])
-            diff_y = [] if len(maxmins_y[-1]) < 1 else np.diff(maxmins_y[-1])
-            k_pp.append([maxmins_x[-1].shape[0],maxmins_y[-1].shape[0]]) 
+            maxmins_y = Maxmins(f[:,randrange(M)].flatten(),**kwargs)
+            if maxmins_y is not None: break
+        #maxmins_y.append(mxms)
+        #del mxms
+        if maxmins_x is not None and maxmins_y is not None:
+            diff_x = [] if np.size(maxmins_x) < 2 else np.diff(maxmins_x)
+            diff_y = [] if np.size(maxmins_y) < 2 else np.diff(maxmins_y)
+            
+            k_pp.append([np.size(maxmins_x),np.size(maxmins_y)]) 
             diffMaxmins_x.append(diff_x) 
             diffMaxmins_y.append(diff_y) 
     if np.sum(k_pp) == 0.:
@@ -432,8 +433,8 @@ def find_max_frequency2D(f,nsamples = 1, **kwargs):
     #calculation (see get_mask_length
     #diffMaxmins_x = np.array(diffMaxmins_x).flatten()
     #diffMaxmins_y = np.array(diffMaxmins_y).flatten()
-    diffMaxmins_x = np.concatenate([i.flatten() for i in diffMaxmins_x if i.size > 0])
-    diffMaxmins_y = np.concatenate([i.flatten() for i in diffMaxmins_y if i.size > 0])
+    diffMaxmins_x = np.concatenate([i.flatten() for i in diffMaxmins_x if np.size(i) > 0])
+    diffMaxmins_y = np.concatenate([i.flatten() for i in diffMaxmins_y if np.size(i) > 0])
     N_pp = (N,M)
 
     return N_pp, k_pp, diffMaxmins_x,diffMaxmins_y

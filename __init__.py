@@ -508,4 +508,31 @@ class MIF():
     @property
     def IMC(self):
         return self.data['IMC']#[:,self.wsh:-self.wsh] if self.wsh >0 else self.data['IMC'] 
+    
+
+    def get_freq_amplitudes(self, as_output = False, use_instantaneous_freq = True,nsamples = None,  **kwargs):
+        """
+        see fif_tools.IMC_get_freq_amp_MIF for a list of **kwargs
+
+        the available **kwargs should be
+            dt = 1. : float 
+                grid resolution (inverse of the sampling frequency)
+                WARNING! It is assumed that 2D grids have same resolution in x and y
+
+            resort = False : Bool
+                if true, frequencies and amplitudes are sorted frequency-wise
+            use_instantaneous_freq = True : bool
+                use the instantaneous freq. to compute the average freq of the IMC
+                
+        """
+        if nsamples is None: nsamples = self.options.Maxmins_samples
+        
+        self.data['freqs'], self.data['amps'] = \
+            ftools.IMC_get_freq_amp_MIF(self.data['IMC'], \
+            use_instantaneous_freq = use_instantaneous_freq, nsamples = nsamples,  **kwargs)
+
+        self.ancillary['get_freq_amplitudes'] = kwargs
+        self.ancillary['get_freq_amplitudes']['use_instantaneous_freq'] = use_instantaneous_freq
+        
+        if as_output: return self.data['freqs'], self.data['amps']
 

@@ -153,13 +153,20 @@ def MIF_v3e(in_f,options,M=np.array([]), window_mask = None, data_mask = None, n
 
     #NOW starting the calculation of the IMFs
 
+    countIMFs = 0
     #Find max-frequency contained in signal
     if ift: ttime.tic 
-    N_pp, k_pp, diffMaxmins_x, diffMaxmins_y = \
-        find_max_frequency2D(f,opts['Maxmins_samples'],tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
+    
+    if 'M' not in locals() or np.size(M) == 0:
+        N_pp, k_pp, diffMaxmins_x, diffMaxmins_y = \
+            find_max_frequency2D(f,opts['Maxmins_samples'],tol=tol,\
+            mode = opts.BCmode, method = opts.Maxmins_method)
+    else:
+        k_pp = [opts.ExtPoints*2] #[int(np.max([nx,ny])/M[countIMFs])]
+        #k_pp = [int(np.max([nx,ny])/M[0])]
+    
     if ift: time_max_nu += ttime.get_toc
 
-    countIMFs = 0
     stats_list = np.recarray(opts.NIMFs,dtype=[('logMx',int),('logMy',int),('inStepN',int)])
     stats_list.logM = 0
     stats_list.inStepN = 0
@@ -172,12 +179,15 @@ def MIF_v3e(in_f,options,M=np.array([]), window_mask = None, data_mask = None, n
         h = np.copy(f)
         if 'M' not in locals() or np.size(M)<countIMFs:
             m = get_mask_length2D(opts,N_pp,k_pp,diffMaxmins_x,diffMaxmins_y,logM,countIMFs)
+            if opts.verbose:
+                print('\n IMF # %1.0d   -   # Extreme points (%s\n' %(countIMFs,k_pp))
         else:
             m = M[countIMFs-1]
-            if type(m) is int : m = (m)*2 
+            if type(m) is not tuple : m = (m,)*2 
+            if opts.verbose:
+                print('\n IMF # %1.0d   -   # mask length (%s\n' %(countIMFs,m))
 
         if opts.verbose:
-            print('\n IMF # %1.0d   -   # Extreme points (%s\n' %(countIMFs,k_pp))
             print('\n  step #            SD             Mask length \n\n')
 
         #stats = {'logM': [], 'inStepN': []}
@@ -214,10 +224,14 @@ def MIF_v3e(in_f,options,M=np.array([]), window_mask = None, data_mask = None, n
         f = f - h
     
         #Find max-frequency contained in residual signal
+        
         if ift: ttime.tic 
-        N_pp, k_pp, diffMaxmins_x, diffMaxmins_y = \
-          find_max_frequency2D(f,opts['Maxmins_samples'],tol=tol, \
-            mode = opts.BCmode, method = opts.Maxmins_method)
+        if 'M' not in locals() or np.size(M)<countIMFs+1:
+            N_pp, k_pp, diffMaxmins_x, diffMaxmins_y = \
+                find_max_frequency2D(f,opts['Maxmins_samples'],tol=tol, \
+                mode = opts.BCmode, method = opts.Maxmins_method)
+        else:
+            k_pp = [opts.ExtPoints*2] #[int(np.max([nx,ny])/M[countIMFs])]
         if ift: time_max_nu += ttime.get_toc
         
 

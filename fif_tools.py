@@ -372,3 +372,58 @@ def Maxmins_v3_6(x, mode = 'wrap'):
     return extrema.squeeze()
 
 
+
+#MIF TOOLS
+def IMC_get_freq_amp_MIF(IMF, dt = 1, resort = False, wshrink = 0, use_instantaneous_freq = True, nsamples = 4):
+    """
+    Compute amplitude and average frequency of a set of IMCs.
+    Parameters
+    ----------
+    use_instantaneous_freq : bool
+        if True, then it uses the instantaneous frequency to calculate the average frequency of the IMC,
+        if False, the average freq is found by counting maxima and minima in the IMC
+
+    wshrink : int (positive)
+        if >0, then only the central part of the IMC[:,wshrink:-wshrink] is used to calculate the amplitude
+        This should be used when periodic extension is used or when windowing is used.
+
+    """
+
+    from random import randrange
+
+    nimfs,nx,ny = IMF.shape
+
+    if use_instantaneous_freq:
+        freqx = []
+        for ix in range(nsamples):
+            imf_if,imf_ia = IMC_get_inst_freq_amp(IMF[:,randrange(nx),:].squeeze(),dt)
+
+            freq = [np.sum(ifreq[0:nx]*iamp[0:nx])/np.sum(iamp[0:nx]) \
+                    for ifreq,iamp in zip(imf_if,imf_ia)]
+            freqx.append(freq)
+        freqx=np.mean(np.asarray(freqx),axis=0)
+        freqy = []
+        for iy in range(nsamples):
+            imf_if,imf_ia = IMC_get_inst_freq_amp(IMF[:,:,randrange(ny)].squeeze(),dt)
+
+            freq = [np.sum(ifreq*iamp)/np.sum(iamp) \
+                    for ifreq,iamp in zip(imf_if,imf_ia)]
+            freqy.append(freq)
+        freqy=np.mean(np.asarray(freqy),axis=0)
+        freq = np.mean(np.asarray([freqx,freqy]),axis=0)
+    else:
+        npeaksx = np.array([np.mean([np.size(Maxmins_v3_6(iimf[randrange(nx),:].flatten())) for it in range(nsamples)]) for iimf in IMF])
+        npeaksy = np.array([np.mean( [np.size(Maxmins_v3_6(iimf[:,randrange(ny)].flatten())) for it in range(nsamples)]) for iimf in IMF])
+        freqx = npeaksx/(2*nx*dt)
+        freqy = npeaksy/(2*ny*dt)
+   
+        freq = np.mean(np.asarray([freqx,freqy]),axis=0)
+    
+    amp0 = np.sqrt(integrate(integrate(IMF[:]**2)))*dt 
+    if resort:
+        kf = np.argsort(freq)
+        freq = freq[kf]
+        amp0 = amp0[kf]
+
+    return np.array(freq),amp0
+
