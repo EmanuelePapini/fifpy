@@ -77,13 +77,14 @@ def find_max_frequency(f, **kwargs):
     """
     
     maxmins = Maxmins(f,**kwargs)
-    if len(maxmins) < 1:
+    if np.size(maxmins) < 2:
         print('No extrema detected')
-        return None,None
+        #return (N,M),[0,0],[],[]
+        return np.size(f),0,None,None
     
     diffMaxmins = np.diff(maxmins)
     
-    N_pp = len(f)
+    N_pp = np.size(f)
     k_pp = maxmins.shape[0]
 
     return N_pp, k_pp, maxmins, diffMaxmins

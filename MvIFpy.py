@@ -159,7 +159,6 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
     while countIMFs < opts.NIMFs and k_pp >= opts.ExtPoints:
         countIMFs += 1
         if not silent: print('IMF', countIMFs)
-        
         h = np.copy(f)
         if 'M' not in locals() or np.size(M)<countIMFs:
             m = get_mask_length(opts,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs)
@@ -187,6 +186,7 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
         if ift: ttime.tic 
         inStepN = 0
         for ic in range(D):
+            if not silent: print('extracting IMF %d, CHANNEL %d (%d)\n'%(countIMFs,ic,D)) 
             hic, inStepNic, SDic = compute_imf(h[ic],a,opts)
             h[ic] = hic
             inStepN = np.max([inStepNic,inStepN])
@@ -202,6 +202,8 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
         
         f = f - h
         #Find max-frequency contained in residual signal
+        #The max frequency is the minimum among the max frequencies
+        #found in the different channels
         if ift: ttime.tic 
         if opts.MaskLengthType == 'amp': 
             k_pp=N
@@ -210,7 +212,7 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
                     find_max_frequency(f[ic],tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
                 if k_ppt<k_pp:
                     N_pp, k_pp, maxmins_pp, diffMaxmins_pp = N_ppt, k_ppt, maxmins_ppt, diffMaxmins_ppt   
-                    del N_ppt, k_ppt, maxmins_ppt, diffMaxmins_ppt
+                del N_ppt, k_ppt, maxmins_ppt, diffMaxmins_ppt
         if ift: time_max_nu += ttime.get_toc
         
         #stats_list.append(stats)

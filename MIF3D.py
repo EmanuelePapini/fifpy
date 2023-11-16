@@ -24,6 +24,8 @@ import time
 import timeit
 from numba import jit,njit,prange,get_num_threads,set_num_threads
 from attrdict import AttrDict as AttrDictSens
+
+from .IF_aux import FKmask 
 __version__='3e'
 
 #WRAPPER (version unaware. To be called by IF.py) 
@@ -88,6 +90,28 @@ def fftconvolveND(f,ker, mode = 'same', BCmode = 'wrap'):
     kpad = np.pad(ker,pads)
     kpad = np.roll(kpad,m,axxs)
     return np.fft.irfftn(np.fft.rfftn(f)*np.fft.rfftn(kpad),s=f.shape) 
+
+def fftconvolve3D_extend(f,ker, mode = 'same', BCmode = 'wrap'):
+    """
+    h_ave = fftconvolve3D_extend(h,kernel,mode='same',BC)
+    unlike fftconvolveND, this one ONLY WORKS for 3D arrays
+    DESCRIPTION ON WHAT IT DOES TO FOLLOW: 3 is the magic number
+    """
+    skip=[3,3,3]
+    if any([i<j for i,j in zip(f.shape,ker.shape)]):
+        print('kernel shape larger than 3D array shape, interpolating in fourier')
+        #for ii,i,j in zip(f.shape,ker.shape):
+        #    if i<j: 
+        #        if j%i : raise Exception('ker shape must be multiple of f shape')
+        #        skip[ii] = j//i
+    
+    m = tuple([-i//2 for i in ker.shape])
+    axxs = tuple([i for i in range(len(m))])
+    pads = [(0,f.shape[i]*3-ker.shape[i]) for i in range(len(f.shape))]
+    kpad = np.pad(ker,pads)
+    kpad = np.roll(kpad,m,axxs)
+    
+    return np.fft.irfftn(np.fft.rfftn(f)*np.fft.rfftn(kpad)[::skip[0],::skip[1],::skip[2]]//27,s=f.shape) 
 
 ################################################################################
 ###################### Iterative Filtering aux functions #######################
@@ -192,7 +216,7 @@ def get_mask_lengthND(options,N_pp,k_pp,diff_xyz,logM,countIMFs):
             raise Exception('Value of alpha not recognized!\n')
     
     else:
-        mm = [2*np.round(options.Xi*np.percentile(diffM_xyz[i],options.alpha)) for i in range(len(N_pp))]
+        mm = [2*np.round(options.Xi*np.percentile(diff_xyz[i],options.alpha)) for i in range(len(N_pp))]
     
     if countIMFs > 1:
         for i in range(len(mm)):
@@ -222,12 +246,15 @@ def get_mask_3D_v3(w,k):
       w is the area under the curve for each bar
       A  the mask with length 2*k+1 x 2*k+1
     wrapped from FIF2_v3.m
+    TO OPTIMIZE UZING NUMBA
     """
+    from numba.typed import List
+
     #check if k tuple contains integers
     if not all([type(i) is int for i in k]):
         print('input mask not integer, making it so')
-        k=tuple([int(i) for i in k])
-
+        k=[int(i) for i in k]
+    k = List(k)
     L=np.size(w)
     m=(L-1)/2;  #2*m+1 =L punti nel filtro
     w = np.pad(w,(0,(L-1)//2))
@@ -243,11 +270,22 @@ def get_mask_3D_v3(w,k):
         t = s+2
         s2 = np.ceil(s) - s
         t1 = t - np.floor(t)
-        for ix in range(2*k[0]+1):
-            for iy in range(2*k[1]+1):
-                for iz in range(2*k[2]+1):
-                    A[ix,iy,iz] = np.sum(w[int(np.ceil(s[ix,iy,iz]))-1:int(t[ix,iy,iz])]) +\
-                         s2[ix,iy,iz] * w[int(np.ceil(s[ix,iy,iz]))-1] + t1[ix,iy,iz]* w[int(t[ix,iy,iz])-1]
+        
+
+        @njit
+        def inner_loop_numba(k,A,w,t,s2,t1):
+            #ix = 0
+            #iy = 0
+            #iz = 0
+            for ix in range(2*k[0]+1):
+                for iy in range(2*k[1]+1):
+                    for iz in range(2*k[2]+1):
+                        A[ix,iy,iz] = np.sum(w[int(np.ceil(s[ix,iy,iz])) \
+                        -1:int(t[ix,iy,iz])]) +\
+                        s2[ix,iy,iz] * w[int(np.ceil(s[ix,iy,iz]))-1] \
+                        + t1[ix,iy,iz]* w[int(t[ix,iy,iz])-1]
+            return A
+        A = inner_loop_numba(k,A,w,t,s2,t1)
         A/=np.sum(A)
     else : #We need a filter with more points than MM, we use interpolation
         print('Need to write the code!')
@@ -303,9 +341,10 @@ def compute_imf_numba(f,a,options):
 
     return h_ave,inStepN,SD
 
-def compute_imf2d_fft(f,a,options):
+def compute_imf3d_fft(f,a,options):
         
 
+    dstepmax=options.dsteps
     h = np.array(f)
     h_ave = np.zeros(len(h))
  
@@ -317,70 +356,95 @@ def compute_imf2d_fft(f,a,options):
     SD = 1.
     #checking whether to extend the signal
     if options.Extend and any([i<j for i,j in zip(h.shape,kernel.shape)]):
-        h = np.pad(h,(h.shape,)*2,mode='wrap')
+        #fftconv = fftconvolve3D_extend
+        #print(h.shape,kernel.shape)
+        h = np.pad(h,[(i,i) for i in h.shape],mode='wrap')
+        fftconv = fftconvolveND
         print(h.shape)
+    else:
+        fftconv = fftconvolveND
     Nh = len(h)
+    
+    di = 100
+    hmin=h[...]
+    dstep=0
     while SD>delta and inStepN<MaxInner:
         inStepN += 1
-        h_ave = fftconvolve2D(h,kernel,mode='same', BCmode = 'wrap')
+        h_ave = fftconv(h,kernel,mode='same', BCmode = 'wrap')
         #computing norm
         SD = LA.norm(h_ave)**2/LA.norm(h)**2
         h = h[...] - h_ave[...]
         h_ave[...] = 0
+        if SD <di: 
+            di=SD
+            hmin = np.copy(h)
+            dstep=0
+            inStepND = inStepN
+        else:
+            dstep+=1
+            if options.verbose:
+                print('(fft):WARNING, delta increasing \n')
+        if dstep>dstepmax:
+            h=hmin
+            inStepN = inStepND
+            SD = di
+            MaxInner = 0
+            if options.verbose:
+                print('(fft): STOPPED AT STEP %2.0d (delta = %1.20f) \n' % (inStepND, di))
         if options.verbose:
             print('(fft): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
-    
+
     if options.verbose:
-        print('(fft): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
+        print('(fft): %2.0d      %1.20f          %s\n' % (inStepN, SD, np.shape(a)))
     if h.shape !=f.shape:
-        nx,ny = f.shape
-        h = h[nx:2*nx,ny:2*ny]
+        nx,ny,nz = f.shape
+        h = h[nx:2*nx,ny:2*ny,nz:2*nz]
 
     return h,inStepN,SD
-def _compute_imf2d_fft_adv(f,a,options):
-        
-    h = np.array(f)
-    h_ave = np.zeros(len(h))
-    
-    
-    ker = a
-    delta = options.delta
-    MaxInner = options.MaxInner
-    ksteps =options.NumSteps
-    
-    inStepN = 0
-    SD = 1.
-    
-    Nh = len(h)
-    if options.Extend and any([i<j for i,j in zip(h.shape,ker.shape)]):
-        h = np.pad(h,(h.shape,)*2,mode='wrap')
-    
-    if any([i<j for i,j in zip(h.shape,ker.shape)]):
-        print('error, kernel shape cannot be larger than 2D array shape')
-        return None,None,None
-    
-    m = [i//2 for i in ker.shape]
-    kpad = np.pad(ker,((0,h.shape[0]-ker.shape[0]),(0,h.shape[1]-ker.shape[1])))
-    kpad = np.roll(kpad,(-m[0],-m[1]),(0,1))
-    fkpad = np.fft.rfft2(kpad); del kpad
-    fh = np.fft.rfft2(h)
-    while SD>delta and inStepN<MaxInner:
-        inStepN += ksteps
-        fh_ave = (1-fkpad)**inStepN * fh
-        fh_avem1 = (1-fkpad)**(inStepN-1) * fh
-        SD = np.abs((np.abs(fh_ave)**2).sum()/(np.abs(fh_avem1)**2).sum() -1)
-    
-        if options.verbose:
-            print('(fft_adv): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
-    
-    if options.verbose:
-        print('(fft_adv): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
-    
-    h = np.fft.irfft2(fh_ave,s=h.shape) 
-    if h.shape !=f.shape:
-        nx,ny = f.shape
-        h = h[nx:2*nx,ny:2*ny]
-    return h,inStepN,SD
+#def _compute_imf2d_fft_adv(f,a,options):
+#        
+#    h = np.array(f)
+#    h_ave = np.zeros(len(h))
+#    
+#    
+#    ker = a
+#    delta = options.delta
+#    MaxInner = options.MaxInner
+#    ksteps =options.NumSteps
+#    
+#    inStepN = 0
+#    SD = 1.
+#    
+#    Nh = len(h)
+#    if options.Extend and any([i<j for i,j in zip(h.shape,ker.shape)]):
+#        h = np.pad(h,(h.shape,)*2,mode='wrap')
+#    
+#    if any([i<j for i,j in zip(h.shape,ker.shape)]):
+#        print('error, kernel shape cannot be larger than 2D array shape')
+#        return None,None,None
+#    
+#    m = [i//2 for i in ker.shape]
+#    kpad = np.pad(ker,((0,h.shape[0]-ker.shape[0]),(0,h.shape[1]-ker.shape[1])))
+#    kpad = np.roll(kpad,(-m[0],-m[1]),(0,1))
+#    fkpad = np.fft.rfft2(kpad); del kpad
+#    fh = np.fft.rfft2(h)
+#    while SD>delta and inStepN<MaxInner:
+#        inStepN += ksteps
+#        fh_ave = (1-fkpad)**inStepN * fh
+#        fh_avem1 = (1-fkpad)**(inStepN-1) * fh
+#        SD = np.abs((np.abs(fh_ave)**2).sum()/(np.abs(fh_avem1)**2).sum() -1)
+#    
+#        if options.verbose:
+#            print('(fft_adv): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
+#    
+#    if options.verbose:
+#        print('(fft_adv): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
+#    
+#    h = np.fft.irfft2(fh_ave,s=h.shape) 
+#    if h.shape !=f.shape:
+#        nx,ny = f.shape
+#        h = h[nx:2*nx,ny:2*ny]
+#    return h,inStepN,SD
 ################################################################################
 ###################### Iterative Filtering main functions ######################
 ################################################################################
@@ -412,13 +476,20 @@ def Settings(**kwargs):
     options['alpha']='ave'
     options['MaxInner']=200
     options['MonotoneMaskLength']=True
-    options['IsotropicMask']=True
+    options['dsteps'] = 200 #number of steps from the minimum of DS found in the iteration
+                            #THIS IS A STOPPING CRITERION
+    #Isotrpic Mask can be either
+    # False, 
+    # True 
+    # list of len 3 of booleans [True,True,False] (or combinations)
+    # list of indices of axes that have to be isotropized [0,1] 
+    options['IsotropicMask']=[True,True,True]
     options['NumSteps']= 4
     options['BCmode'] = 'wrap' #'clip' #wrap
     options['Maxmins_method'] = 'zerocrossing'
     options['Maxmins_samples'] = 4
     options['imf_method'] = 'fft' #numba
-    options['Extend'] = True #If true, extends the signal from nx,ny to 3nx,3ny in case a mask
+    options['Extend'] = False #If true, extends the signal from nx,ny to 3nx,3ny in case a mask
                              #bigger than nx (ny) is found
     for i in kwargs:
         if i in options.keys() : options[i] = kwargs[i] 
@@ -432,7 +503,7 @@ def MIF3D_run(x, options=None, M = np.array([]),**kwargs):
     return MIF_v3e(x,options,M=M,**kwargs)
 
 
-def MIF3D_v3(f,options,M=np.array([]), window_file=None, data_mask = None, nthreads = None):
+def MIF3D_v3(f,options,M=np.array([]), window_mask=None, data_mask = None, nthreads = None):
 
     """
     Multidimensional Iterative Filtering python implementation 
@@ -444,6 +515,7 @@ def MIF3D_v3(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
 
     """
     opts = AttrDictSens(options)
+    IsoMask = opts.IsotropicMask
     if nthreads is not None:
         if opts.imf_method == 'numba': 
             set_num_threads(nthreads)
@@ -458,7 +530,7 @@ def MIF3D_v3(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     tol = 1e-12 
 
     if opts.imf_method == 'fft': 
-        compute_imf3D = compute_imf2d_fft
+        compute_imf3D = compute_imf3d_fft
         #compute_imf2D = _compute_imf2d_fft_adv
     elif opts.imf_method == 'numba': 
         compute_imf3D = compute_imf2d_numba
@@ -473,19 +545,18 @@ def MIF3D_v3(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         time_mask = 0.
         ttime.tic
 
-    if window_file is None:
-        window_file = get_window_file_path()
-    try:
-        MM = loadmat(window_file)['MM'].flatten()
-    except:
-        raise ValueError("ERROR! Could not load window function from file: "+window_file)
+    if window_mask is None:
+        MM = FKmask #get_window_file_path()
+    else:
+        MM = window_mask
+
     f = np.asarray(f)
-    if len(f.shape) != 2: 
-        raise Exception('Wrong dataset, the signal must be a 2D array!')
+    if len(f.shape) != 3: 
+        raise Exception('Wrong dataset, the signal must be a 3D array!')
     
     #setting up machinery
-    nx,ny = f.shape
-    IMF = np.zeros([opts.NIMFs, nx,ny])
+    nx,ny,nz = f.shape
+    IMF = np.zeros([opts.NIMFs, nx,ny,nz])
     #normalizing signal such as the maximum is +-1
     Norm1f = np.max(np.abs(f))
     f = f/Norm1f
@@ -494,15 +565,16 @@ def MIF3D_v3(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
 
     #Find max-frequency contained in signal
     if ift: ttime.tic 
-    N_pp, k_pp, diffMaxmins_x, diffMaxmins_y = \
-        find_max_frequency2D(f,opts['Maxmins_samples'],tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
+    N_pp, k_pp, diffMaxmins = \
+       find_max_frequencyND(f,opts['Maxmins_samples'],tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
     if ift: time_max_nu += ttime.get_toc
 
     countIMFs = 0
-    stats_list = np.recarray(opts.NIMFs,dtype=[('logMx',int),('logMy',int),('inStepN',int)])
+    stats_list = np.recarray(opts.NIMFs,dtype=[('logMx',int),('logMy',int),\
+        ('logMz',int),('inStepN',int)])
     stats_list.logM = 0
     stats_list.inStepN = 0
-    logM = (1,1) 
+    logM = (1,1,1) 
     ### Begin Iterating ###
     while countIMFs < opts.NIMFs and all([ii >= opts.ExtPoints for ii in k_pp]):
         countIMFs += 1
@@ -510,7 +582,7 @@ def MIF3D_v3(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         
         h = f
         if 'M' not in locals() or np.size(M)<countIMFs:
-            m = get_mask_length2D(opts,N_pp,k_pp,diffMaxmins_x,diffMaxmins_y,logM,countIMFs)
+            m = get_mask_lengthND(opts,N_pp,k_pp,diffMaxmins,logM,countIMFs)
         else:
             m = M[countIMFs-1]
             if type(m) is int : m = (m)*2 
@@ -523,10 +595,30 @@ def MIF3D_v3(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
         #stats['logM'].append(int(m))
         stats_list[countIMFs-1].logMx = int(m[0])
         stats_list[countIMFs-1].logMy = int(m[1])
-        logM = (int(np.min(m)),)*2 if opts.IsotropicMask else m 
+        stats_list[countIMFs-1].logMz = int(m[2])
+        
+        #dealing with isotropic option
+        if IsoMask is not False:
+        
+            if IsoMask is True:
+                logM = (int(np.min(m)),)*3
+            elif type(IsoMask) is list:
+                logM = m.copy()
+                if all([type(i) is int for i in IsoMask]):
+                    mmin = np.min([m[i] for i in IsoMask])
+                    for i in IsoMask: logM[i] = mmin
+                elif all([type(i) is bool for i in IsoMask]):
+                    mmin = np.min([m[i] for i,j in enumerate(IsoMask) if j])
+                    for i,j in enumerate(IsoMask): 
+                        if j: logM[i] = mmin
+                else:
+                    raise Exception('Wrong value of options.IsotropicMask')
+               
+        else:
+            logM = m
         
         if ift: ttime.tic 
-        a = get_mask_2D_v3(MM, m)
+        a = get_mask_3D_v3(MM, m)
         if ift: time_mask += ttime.get_toc
         #if the mask is bigger than the signal length, the decomposition ends.
         if any([ii< jj for ii,jj in zip(f.shape,a.shape)]) and not opts.Extend: 
@@ -539,7 +631,7 @@ def MIF3D_v3(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
             break
         
         if ift: ttime.tic 
-        h, inStepN, SD = compute_imf2D(h,a,opts)
+        h, inStepN, SD = compute_imf3D(h,a,opts)
         if ift: time_imfs += ttime.get_toc
         
         if inStepN >= opts.MaxInner:
@@ -554,13 +646,14 @@ def MIF3D_v3(f,options,M=np.array([]), window_file=None, data_mask = None, nthre
     
         #Find max-frequency contained in residual signal
         if ift: ttime.tic 
-        N_pp, k_pp, diffMaxmins_x, diffMaxmins_y = \
-            find_max_frequency2D(f,opts['Maxmins_samples'],tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
+        N_pp, k_pp, diffMaxmins = \
+            find_max_frequencyND(f,opts['Maxmins_samples'],tol=tol,\
+            mode = opts.BCmode, method = opts.Maxmins_method)
         if ift: time_max_nu += ttime.get_toc
         
 
     IMF = IMF[0:countIMFs]
-    IMF = np.vstack([IMF, f.reshape((1,nx,ny))])
+    IMF = np.vstack([IMF, f.reshape((1,nx,ny,nz))])
     stats_list = stats_list[:countIMFs]
 
     IMF = IMF*Norm1f # We scale back to the original values
