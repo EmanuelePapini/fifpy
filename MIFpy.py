@@ -15,27 +15,15 @@
 
 import os
 import numpy as np
-from numpy import linalg as LA
-from scipy.io import loadmat
-from scipy.signal import argrelextrema 
-from numpy import fft
 import time
-#import pandas as pd
 import timeit
-from numba import jit,njit,prange,get_num_threads,set_num_threads
 from attrdict import AttrDict as AttrDictSens
 
 from .IF_aux import Maxmins, FKmask, find_max_frequency2D, \
     get_mask_length2D, get_mask_2D_v3, compute_imf2d_fft, _compute_imf2d_fft_adv
 
-__version__='3e'
+__version__='8.4'
 
-#WRAPPER (version unaware. To be called by IF.py) 
-# def IF_run(*args,**kwargs):
-#     return IF_v8_3e(*args,**kwargs)
-
-#WRAPPER (version unaware. To be called by FIF.py) 
-   
 
 ################################################################################
 ###################### Iterative Filtering main functions ######################
@@ -46,19 +34,12 @@ def Settings(**kwargs):
     Sets the default options to be passed to MIF
     WARNING: NO CHECK IS DONE ON THE VALIDITY OF THE INPUT
     
-    WRAPPED FROM: Settings_v3.m
-    NOTE:
-    selecting options['imf_method'] = fft should be equivalent to do FIF
     """
 
     options = {}
     # General 
-    #options['saveEnd'] = 0
-    #options['saveInter'] = 0
     options['verbose'] = False    
     options['timeit'] = False    
-    #options['plots'] = 0.0
-    #options['saveplots'] = 0     
         
     # FIF
     options['delta'] = 0.001
@@ -78,6 +59,7 @@ def Settings(**kwargs):
                              #bigger than nx (ny) is found
     for i in kwargs:
         if i in options.keys() : options[i] = kwargs[i] 
+    options['imf_method'] = 'fft' #numba
     return AttrDictSens(options)
 
 
@@ -87,11 +69,11 @@ def MIF_run(x, options=None, M = np.array([]),**kwargs):
     if options is None:
         options = Settings()
     
-    return MIF_v3e(x,options,M=M,**kwargs)
+    return MIF(x,options,M=M,**kwargs)
 
 def FIF_run(*args,**kwargs): return MIF_run(*args,**kwargs)
 
-def MIF_v3e(in_f,options,M=np.array([]), window_mask = None, data_mask = None, nthreads = None):
+def MIF(in_f,options,M=np.array([]), window_mask = None, data_mask = None):#, nthreads = None):
 
     """
     Multidimensional Iterative Filtering python implementation 
@@ -101,7 +83,6 @@ def MIF_v3e(in_f,options,M=np.array([]), window_mask = None, data_mask = None, n
         
         THE REST OF THE CRAZY INPUT IS AS USUAL :P
 
-    N.B. nthreads to be implemented in case of numba decomposition (also to be implemented)
 
     """
     f = np.copy(in_f)
@@ -115,8 +96,8 @@ def MIF_v3e(in_f,options,M=np.array([]), window_mask = None, data_mask = None, n
         print('****IF settings****')
         [print(i+':',options[i]) for i in options]
         print('data_mask   : ', data_mask is not None )
-        if opts.imf_method == 'numba':
-            print('Using nthreads: ',get_num_threads())
+        #if opts.imf_method == 'numba':
+        #    print('Using nthreads: ',get_num_threads())
     tol = 1e-12 
 
     if opts.imf_method == 'fft': 
@@ -163,7 +144,6 @@ def MIF_v3e(in_f,options,M=np.array([]), window_mask = None, data_mask = None, n
             mode = opts.BCmode, method = opts.Maxmins_method)
     else:
         k_pp = [opts.ExtPoints*2] #[int(np.max([nx,ny])/M[countIMFs])]
-        #k_pp = [int(np.max([nx,ny])/M[0])]
     
     if ift: time_max_nu += ttime.get_toc
 
@@ -190,8 +170,6 @@ def MIF_v3e(in_f,options,M=np.array([]), window_mask = None, data_mask = None, n
         if opts.verbose:
             print('\n  step #            SD             Mask length \n\n')
 
-        #stats = {'logM': [], 'inStepN': []}
-        #stats['logM'].append(int(m))
         stats_list[countIMFs-1].logMx = int(m[0])
         stats_list[countIMFs-1].logMy = int(m[1])
         logM = (int(np.min(m)),)*2 if opts.IsotropicMask else m 
@@ -216,7 +194,6 @@ def MIF_v3e(in_f,options,M=np.array([]), window_mask = None, data_mask = None, n
         if inStepN >= opts.MaxInner:
             print('Max # of inner steps reached')
 
-        #stats['inStepN'].append(inStepN)
         stats_list[countIMFs-1].inStepN = inStepN
         
         IMF[countIMFs-1] = h

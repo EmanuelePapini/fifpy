@@ -28,47 +28,10 @@ from attrdict import AttrDict as AttrDictSens
 from .IF_aux import FKmask 
 __version__='3e'
 
-#WRAPPER (version unaware. To be called by IF.py) 
-# def IF_run(*args,**kwargs):
-#     return IF_v8_3e(*args,**kwargs)
-
-#WRAPPER (version unaware. To be called by FIF.py) 
 
 ################################################################################
 ########################## AUXILIARY FUNCTIONS #################################
 ################################################################################
-#class AttrDictSens(dict):
-#    '''
-#    A case-sensitive dictionary with access via item, attribute, and call
-#    notations:
-#
-#        >>> d = AttrDict()
-#        >>> d['Variable'] = 123
-#        >>> d['Variable']
-#        123
-#        >>> d.Variable
-#        123
-#        >>> d.variable
-#        123
-#        >>> d('VARIABLE')
-#        123
-#    '''
-#
-#    def __init__(self, init={}):
-#        dict.__init__(self, init)
-#
-#    def __getitem__(self, name):
-#        try :
-#            return super(AttrDictSens, self).__getitem__(name)
-#        except:
-#            raise AttributeError
-#
-#    def __setitem__(self, key, value):
-#        return super(AttrDictSens, self).__setitem__(key, value)
-#
-#    __getattr__ = __getitem__
-#    __setattr__ = __setitem__
-#    __call__ = __getitem__
 
 def get_window_file_path():
     import sys
@@ -400,50 +363,6 @@ def compute_imf3d_fft(f,a,options):
         h = h[nx:2*nx,ny:2*ny,nz:2*nz]
 
     return h,inStepN,SD
-#def _compute_imf2d_fft_adv(f,a,options):
-#        
-#    h = np.array(f)
-#    h_ave = np.zeros(len(h))
-#    
-#    
-#    ker = a
-#    delta = options.delta
-#    MaxInner = options.MaxInner
-#    ksteps =options.NumSteps
-#    
-#    inStepN = 0
-#    SD = 1.
-#    
-#    Nh = len(h)
-#    if options.Extend and any([i<j for i,j in zip(h.shape,ker.shape)]):
-#        h = np.pad(h,(h.shape,)*2,mode='wrap')
-#    
-#    if any([i<j for i,j in zip(h.shape,ker.shape)]):
-#        print('error, kernel shape cannot be larger than 2D array shape')
-#        return None,None,None
-#    
-#    m = [i//2 for i in ker.shape]
-#    kpad = np.pad(ker,((0,h.shape[0]-ker.shape[0]),(0,h.shape[1]-ker.shape[1])))
-#    kpad = np.roll(kpad,(-m[0],-m[1]),(0,1))
-#    fkpad = np.fft.rfft2(kpad); del kpad
-#    fh = np.fft.rfft2(h)
-#    while SD>delta and inStepN<MaxInner:
-#        inStepN += ksteps
-#        fh_ave = (1-fkpad)**inStepN * fh
-#        fh_avem1 = (1-fkpad)**(inStepN-1) * fh
-#        SD = np.abs((np.abs(fh_ave)**2).sum()/(np.abs(fh_avem1)**2).sum() -1)
-#    
-#        if options.verbose:
-#            print('(fft_adv): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
-#    
-#    if options.verbose:
-#        print('(fft_adv): %2.0d      %1.40f          %s\n' % (inStepN, SD, np.shape(a)))
-#    
-#    h = np.fft.irfft2(fh_ave,s=h.shape) 
-#    if h.shape !=f.shape:
-#        nx,ny = f.shape
-#        h = h[nx:2*nx,ny:2*ny]
-#    return h,inStepN,SD
 ################################################################################
 ###################### Iterative Filtering main functions ######################
 ################################################################################
@@ -499,7 +418,7 @@ def MIF3D_run(x, options=None, M = np.array([]),**kwargs):
     if options is None:
         options = Settings()
     
-    return MIF_v3e(x,options,M=M,**kwargs)
+    return MIF3D_v3(x,options,M=M,**kwargs)
 
 
 def MIF3D_v3(f,options,M=np.array([]), window_mask=None, data_mask = None, nthreads = None):
