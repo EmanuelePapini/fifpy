@@ -77,7 +77,6 @@ def get_window_file_path():
 
 def fftconvolveND(f,ker, mode = 'same', BCmode = 'wrap'):
     """
-    h_ave = fftconvolve2D(h,kernel,mode='same',BC)
     SO FAR only mode = 'same' and BCmode = 'wrap' are implemented
     maybe use pylab_convolve2D for direct convolution
 """

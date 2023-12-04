@@ -16,7 +16,7 @@ import sys
 import numpy as np
 from copy import copy
 
-from . import FIF_v2_13 as FIFpy
+from . import FIFpy
 from . import MvFIFpy
 from . import IFpy
 from . import MvIFpy
@@ -187,6 +187,14 @@ class FIF():
         
         if as_output: return self.data['freqs'], self.data['amps']
 
+    def orthogonalize(self,threshold = 0.6, only_nearest = True, **kwargs):
+        
+        if self.data['IMC'].shape[0] <3: #if shape==2 then only one imf was extracted
+            return
+        IMCs = self.data['IMC']
+        imfs = ftools.orthogonalize(IMCs,threshold, only_nearest, **kwargs)
+        self.ancillary['orthogonalized'] = True
+        self.data['IMC'] = imfs
 
 
     def copy(self):

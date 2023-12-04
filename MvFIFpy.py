@@ -1,7 +1,7 @@
 """
  Multivariate Fast Iterative Filtering python package
 
- Dependencies : numpy, scipy, numba
+ Dependencies : numpy, scipy, numba,sklearn
 
  Authors: 
     Python version: Emanuele Papini - INAF (emanuele.papini@inaf.it) 
@@ -13,109 +13,49 @@ from numpy import linalg as LA
 from scipy.io import loadmat
 from scipy.signal import argrelextrema 
 from numba import jit,njit
-from .IF_aux import FKmask
-__version__='8.0'
+from .IF_aux import FKmask, lanorm, get_mask_v1_1
+__version__='8.4'
 
+
+def Settings(**kwargs):
+    """
+    Sets the default options to be passed to MvFIF
+    WARNING: NO CHECK IS DONE ON THE VALIDITY OF THE INPUT
+    
+    """
+
+    options = {}
+    # General 
+    options['verbose'] = False #toggle verbosity level.
+    options['delta'] = 0.001 #SC1: threshold in the difference of 2Norm 
+    options['ExtPoints']=3 #SC2: minimum number of extrema
+    options['NIMFs']=200 #SC3: maximum number of IMF to be extracted
+    options['MaxInner']=200 #SC4: maximum number of iterations
+    
+    options['Xi']=1.6 #stretching factor of the mask
+    options['alpha']='ave' #sets how to calculate the masklength from freq. distribution
+    options['MonotoneMaskLength']=True #sets if a monotone mask length is forced
+    options['MaskLengthType']='angle' #sets if a monotone mask length is forced
+    options['NumSteps']=1 #number of internal steps in IF loop between two FFTs
+    options['fft'] = 'pyfftw' #numba #select the numerical method for computation
+    options['threads'] = None #numba #select the numerical method for computation
+                              # automatically set to the length of the timeseries.
+    for i in kwargs:
+        if i in options.keys() : options[i] = kwargs[i] 
+    return AttrDictSens(options)
 
 #WRAPPER (version unaware. To be called by MvFIF.py) 
-def FIF_run(x, *args, options=None, M = np.array([]),**kwargs):
+def FIF_run(x,  options=None, **kwargs):
     
     if options is None:
-        return MvFIF(x,*args,**kwargs)
-    else:
-        return MvFIF(x, options['delta'], options['alpha'], options['NumSteps'], \
-                           options['ExtPoints'], options['NIMFs'], options['MaxInner'], \
-                           Xi = options['Xi'], M = M, \
-                    MonotoneMaskLength = options['MonotoneMaskLength'], \
-                    verbose = options['verbose'],**kwargs)
-
-
-@njit
-def lanorm(x,ordd):
-    return LA.norm(x,ordd)
-
-
-def get_mask_v1_1(y, k):
-    """
-    Rescale the mask y so that its length becomes 2*k+1.
-    k could be an integer or not an integer.
-    y is the area under the curve for each bar
-    """
-    n = np.size(y)
-    m = (n-1)//2
-    k = int(k)
-
-    if k<=m:
-
-        if np.mod(k,1) == 0:
-            
-            a = np.zeros(2*k+1)
-            
-            for i in range(1, 2*k+2):
-                s = (i-1)*(2*m+1)/(2*k+1)+1
-                t = i*(2*m+1)/(2*k+1)
-
-                s2 = np.ceil(s) - s
-
-                t1 = t - np.floor(t)
-
-                if np.floor(t)<1:
-                    print('Ops')
-
-                a[i-1] = np.sum(y[int(np.ceil(s))-1:int(np.floor(t))]) +\
-                         s2*y[int(np.ceil(s))-1] + t1*y[int(np.floor(t))-1]
-        else:
-            new_k = int(np.floor(k))
-            extra = k - new_k
-            c = (2*m+1)/(2*new_k+1+2*extra)
-
-            a = np.zeros(2*new_k+3)
-
-            t = extra*c + 1
-            t1 = t - np.floor(t)
-
-            if k<0:
-                print('Ops')
-                a = []
-                return a
-
-            a[0] = np.sum(y[:int(np.floor(t))]) + t1*y[int(np.floor(t))-1]
-
-            for i in range(2, 2*new_k+3):
-                s = extra*c + (i-2)*c+1
-                t = extra*c + (i-1)*c
-                s2 = np.ceil(s) - s
-                t1 = t - np.floor(t)
-
-                a[i-1] = np.sum(y[int(np.ceil(s))-1:int(np.floor(t))]) +\
-                         s2*y[int(np.ceil(s))-1] + t1*y[int(np.floor(t))-1]
-            t2 = np.ceil(t) - t
-
-            a[2*new_k+2] = np.sum(y[int(np.ceil(t))-1:n]) + t2*y[int(np.ceil(t))-1]
-
-    else: # We need a filter with more points than MM, we use interpolation
-        dx = 0.01
-        # we assume that MM has a dx = 0.01, if m = 6200 it correspond to a
-        # filter of length 62*2 in the physical space
-        f = y/dx
-        dy = m*dx/k
-        # b = np.interp(list(range(1,int(m+1),m/k)), list(range(0,int(m+1))), f[m:2*m+1])
-        b = np.interp(np.linspace(0,m,int(np.ceil(k+1))), np.linspace(0,m,m+1), f[m:2*m+1])
-
-
-        a = np.concatenate((np.flipud(b[1:]), b))*dy
-
-        if abs(LA.norm(a,1)-1)>10**-14:
-            print('\n\n Warning!\n\n')
-            print(' Area under the mask equals %2.20f\n'%(LA.norm(a,1),))
-            print(' it should be equal to 1\n We rescale it using its norm 1\n\n')
-            a = a/LA.norm(a,1)
-        
-    return a
+        options = Settings()
+    
+    return MvFIF(x,options,**kwargs)
 
 
 
-def MvFIF(x, delta, alpha, NumSteps, ExtPoints, NIMFs, MaxInner, Xi=1.6, M=np.array([]), MonotoneMaskLength=True, verbose=False,window_mask=None,fft='pyfftw',threads=None):
+def MvFIF(x, options,M=np.array([]),data_mask = None):#delta, alpha, NumSteps, ExtPoints, NIMFs, MaxInner, Xi=1.6, M=np.array([]), MonotoneMaskLength=True, verbose=False,window_mask=None,fft='pyfftw',threads=None, MaskLengthType = 'angle',data_mask = None):
+   
     """
     MultiVariate Fast Iterative Filtering python implementation (version 8)
     adapted from MvFIF_v8.m
@@ -129,6 +69,9 @@ def MvFIF(x, delta, alpha, NumSteps, ExtPoints, NIMFs, MaxInner, Xi=1.6, M=np.ar
         i.e., it is a concurrent decomposition
     """
     print('running MvFIF decomposition...')
+    #unwrapping the options dict
+    for ikey in options:
+        locals()[ikey] = options[ikey]
 
     if fft =='pyfftw':
         print('using pyfftw...')
@@ -156,26 +99,51 @@ def MvFIF(x, delta, alpha, NumSteps, ExtPoints, NIMFs, MaxInner, Xi=1.6, M=np.ar
     MM = FKmask if window_mask is None else window_mask
 
     ### Create a signal without zero regions and compute the number of extrema ###
-    g = normc(f)
-    g = np.array(dot(g[:,0:-1],g[:,1:]))
-    g[g>1] = 1
-    g[g<-1] = -1
-    f_pp = np.arccos(g)
- 
-    f_pp = np.delete(f_pp, np.argwhere(abs(f_pp)<=1e-18))
-    if np.size(f_pp) < 1:
-        print('Signal too small')
-        return None, None
+    if MaskLengthType == 'angle':
+        g = normc(f)
+        g = np.array(dot(g[:,0:-1],g[:,1:]))
+        g[g>1] = 1
+        g[g<-1] = -1
+        f_pp = np.arccos(g)
 
-    maxmins_pp = Maxmins_v3_8(f_pp,tol,mode='wrap')[0]
-    if np.size(maxmins_pp) < 1:
-        print('Signal too small')
-        return None, None
+        if data_mask is not None:
+            f_pp = np.delete(f_pp,data_mask[:-1])
+        f_pp = np.delete(f_pp, np.argwhere(abs(f_pp)<=1e-18))
+        if np.size(f_pp) < 1:
+            print('Signal too small')
+            return None, None
+
+        maxmins_pp = Maxmins_v3_8(f_pp,tol,mode='wrap')[0] 
+        if np.size(maxmins_pp) < 1:
+            print('Signal too small')
+            return None, None
+        
+        diffMaxmins_pp = np.diff(maxmins_pp)
+        
+        N_pp = f_pp.shape[0]
+        k_pp = maxmins_pp.shape[0]
     
-    diffMaxmins_pp = np.diff(maxmins_pp)
-    
-    N_pp = f_pp.shape[0]
-    k_pp = maxmins_pp.shape[0]
+    elif MaskLengthType == 'amp': 
+        k_pp = np.zeros(D)
+        for ic in range(D):
+            f_pp = f[ic][...].flatten()
+            tols = np.max(np.abs(f_pp))*tol
+            if data_mask is not None:
+                f_pp = np.delete(f_pp,data_mask)
+            f_pp = np.delete(f_pp, np.argwhere(abs(f_pp)<=tols))
+            if np.size(f_pp) < 1:
+                k_pp[ic] = 1e20
+            else:
+                maxmins_pp = Maxmins_v3_8(f_pp,tol = tols,mode='wrap')[0] 
+                diffMaxmins_pp = np.diff(maxmins_pp)
+                N_pp = f_pp.shape[0]
+                k_pp[ic] = maxmins_pp.shape[0]
+        k_pp = k_pp.min()
+        if k_pp == 1e20:
+            print('Signal too small')
+            return None, None
+
+
     countIMFs = 0
     stats_list = []
     
@@ -294,38 +262,64 @@ def MvFIF(x, delta, alpha, NumSteps, ExtPoints, NIMFs, MaxInner, Xi=1.6, M=np.ar
         f = f-h
 
         #### Create a signal without zero regions and compute the number of extrema ####
-
-        g = normc(f)
-        g = np.array(dot(g[:,0:-1],g[:,1:]))
-        g[g>1] = 1
-        g[g<-1] = -1
-        f_pp = np.arccos(g)
-        f_pp = np.delete(f_pp, np.argwhere(abs(f_pp)<=1e-18))
-        if np.size(f_pp) < 1:
-            print('Signal too small')
-            return None, None
+        if MaskLengthType == 'angle':
         
-        if stats['logM'][-1] >=20:
-            maxmins_pp=Maxmins_v3_8(movmean(f_pp,10),tol)[0] 
-            # to include potential extrema at the boundaries 
-            # we extend periodicaly of 10 points the signal
-            # we make sure that the extrema identified belong to the signal before
-            # pre-extention of 10 points
-        else:
-            maxmins_pp=Maxmins_v3_8(f_pp,tol)[0] 
+            g = normc(f)
+            g = np.array(dot(g[:,0:-1],g[:,1:]))
+            g[g>1] = 1
+            g[g<-1] = -1
+            f_pp = np.arccos(g)
+            if data_mask is not None:
+                f_pp = np.delete(f_pp,data_mask[:-1])
+            f_pp = np.delete(f_pp, np.argwhere(abs(f_pp)<=1e-18))
+            if np.size(f_pp) < 1:
+                print('Signal too small')
+                return None, None
+            
+            if stats['logM'][-1] >=20:
+                maxmins_pp=Maxmins_v3_8(movmean(f_pp,10),tol)[0] 
+                # to include potential extrema at the boundaries 
+                # we extend periodicaly of 10 points the signal
+                # we make sure that the extrema identified belong to the signal before
+                # pre-extention of 10 points
+            else:
+                maxmins_pp=Maxmins_v3_8(f_pp,tol)[0] 
  
-        if maxmins_pp is None:
-            break
+            if maxmins_pp is None:
+                break
 
-        diffMaxmins_pp = np.diff(maxmins_pp)
-        N_pp = np.size(f_pp)
-        k_pp = maxmins_pp.shape[0]
+            diffMaxmins_pp = np.diff(maxmins_pp)
+            N_pp = np.size(f_pp)
+            k_pp = maxmins_pp.shape[0]
+        
+        elif MaskLengthType == 'amp': 
+            k_pp = np.zeros(D)
+            for ic in range(D):
+                f_pp = f[ic][...]
+                tols = np.max(np.abs(f_pp))*tol
+                if data_mask is not None:
+                    f_pp = np.delete(f_pp,data_mask)
+                f_pp = np.delete(f_pp, np.argwhere(abs(f_pp)<=tols))
+                if np.size(f_pp) < 1:
+                    k_pp[ic] = 1e20
+                else:
+                    maxmins_pp = Maxmins_v3_8(f_pp,tol = tols, mode='wrap')[0] 
+                    diffMaxmins_pp = np.diff(maxmins_pp)
+                    N_pp = f_pp.shape[0]
+                    k_pp[ic] = maxmins_pp.shape[0]
+            k_pp = k_pp.min()
+            if k_pp == 1e20:
+                print('Signal too small')
+                return None, None
 
         stats_list.append(stats)
 
     IMF = IMF[0:countIMFs+1]
     IMF[countIMFs] = f
 
+    if verbose:
+        print('Elapsed time (sec): ',time()-tstart)
+    print('IMFs extracted: ', countIMFs)
     return IMF, stats_list
 
 

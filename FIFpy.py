@@ -10,13 +10,7 @@ import timeit
 from numba import jit
 from .IF_aux import FKmask
 
-__version__='2.13'
-
-#WRAPPER (version unaware. To be called by FIF.py) 
-# def FIF_run(*args,**kwargs):
-#     return FIF_v2_9(*args,**kwargs)
-
-#WRAPPER (version unaware. To be called by FIF.py) 
+__version__='2.14'
 
 def movmean(f,n):
     """
@@ -165,10 +159,6 @@ def get_mask_v1_1(y, k,verbose,tol):
     return a
         
 
-def get_window_file_path():
-    import sys
-    _path_=sys.modules[__name__].__file__[0:-12]
-    return _path_+'prefixed_double_filter.mat'
 
 def Settings(**kwargs):
     """
@@ -195,7 +185,6 @@ def Settings(**kwargs):
     options['MaxInner']=200
     options['MonotoneMaskLength']=True
     options['NumSteps']=1
-    options['MaskLengthType']='angle'
 
 
     for i in kwargs:
@@ -210,7 +199,7 @@ def FIF_run(x, options=None, M = np.array([]),**kwargs):
     
     return FIF_v2_13(x,options,M=M,**kwargs)
 
-def FIF_v2_13(f,options,M=np.array([]),window_mask=None):
+def FIF_v2_13(f,options,M=np.array([]),window_mask=None, data_mask = None):
    
  
     tol = 1e-12 
@@ -236,6 +225,7 @@ def FIF_v2_13(f,options,M=np.array([]),window_mask=None):
     MM = window_mask #loadmat(window_file)['MM'].flatten()
 
     ### Create a signal without zero regions and compute the number of extrema ###
+    f_pp = np.delete(f,data_mask) if data_mask is not None else f
     f_pp = np.delete(f, np.argwhere(abs(f)<=tol))
     if np.size(f_pp) < 1: 
         print('Signal too small')
@@ -373,6 +363,7 @@ def FIF_v2_13(f,options,M=np.array([]),window_mask=None):
 
         #### Create a signal without zero regions and compute the number of extrema ####
 
+        f_pp = np.delete(f,data_mask) if data_mask is not None else f
         f_pp = np.delete(f, np.argwhere(abs(f)<=tol))
         if np.size(f_pp) <1:
             break
@@ -392,9 +383,6 @@ def FIF_v2_13(f,options,M=np.array([]),window_mask=None):
 
         stats_list.append(stats)
 
-    # f = f.reshape(1,-1)
-    # IMF = IMF[0:countIMFs, :]
-    # IMF = np.concatenate((IMF, f), axis=0)
     IMF = IMF[0:countIMFs, :]
     IMF = np.vstack([IMF, f[:]])
 

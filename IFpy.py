@@ -1,429 +1,55 @@
 """
  Iterative Filtering python package
 
- Dependencies : numpy, scipy, numba, joblib  //TO CHECK
+ Dependencies : numpy, scipy, numba
 
  Authors: 
     Python version: Emanuele Papini - INAF (emanuele.papini@inaf.it) 
     Original matlab version: Antonio Cicone - university of L'Aquila (antonio.cicone@univaq.it)
 
 """
-
-
-
-
 import time
-#import pandas as pd
 import timeit
 from .IF_aux import *
-__version__='8.3e'
+__version__='8.4'
 
 
-################################################################################
-########################## AUXILIARY FUNCTIONS #################################
-################################################################################
-#class AttrDictSens(dict):
-#    '''
-#    A case-sensitive dictionary with access via item, attribute, and call
-#    notations:
-#
-#        >>> d = AttrDict()
-#        >>> d['Variable'] = 123
-#        >>> d['Variable']
-#        123
-#        >>> d.Variable
-#        123
-#        >>> d.variable
-#        123
-#        >>> d('VARIABLE')
-#        123
-#    '''
-#
-#    def __init__(self, init={}):
-#        dict.__init__(self, init)
-#
-#    def __getitem__(self, name):
-#        try :
-#            return super(AttrDictSens, self).__getitem__(name)
-#        except:
-#            raise AttributeError
-#
-#    def __setitem__(self, key, value):
-#        return super(AttrDictSens, self).__setitem__(key, value)
-#
-#    __getattr__ = __getitem__
-#    __setattr__ = __setitem__
-#    __call__ = __getitem__
-#
-#def get_window_file_path():
-#    import sys
-#    _path_=sys.modules[__name__].__file__[0:-12]
-#    return _path_+'/prefixed_double_filter.mat'
-
-
-################################################################################
-###################### Iterative Filtering aux functions #######################
-################################################################################
-
-#def Maxmins(x, tol = 1e-12, mode = 'clip', method = 'zerocrossing'):
-#    """
-#    method: str
-#        'argrelextrema': compute maxima and minima using argrelextrema. Ignores tol
-#        'zerocrossing' : compute maxima and minima using zero crossing of 1st derivative.
-#                         If diff through the crossing is less than tol, the point is ignored. 
-#    """
-#    if method == 'argrelextrema':
-#        from scipy.signal import argrelextrema
-#        maxima = argrelextrema(x, np.greater, mode = mode)
-#        minima = argrelextrema(x, np.less, mode = mode)
-#
-#        extrema = np.sort(np.concatenate((maxima, minima), axis=1))
-#    elif method == 'zerocrossing':
-#        dx = np.diff(x) #naive derivative
-#        sgns = np.diff(np.sign(dx)) #location of maxmins: max/min where sgns = -2/+2
-#        extrema = np.where(sgns != 0)[0]
-#        if len(extrema) < 1: return None
-#        dx = np.abs(dx[1:][extrema])
-#        extrema = extrema[dx>tol]
-#        if len(extrema) < 1: return None
-#        extrema +=1
-#    else: raise Exception('WRONG INPUT METHOD!')
-#
-#    return extrema.squeeze()
-#   
-#
-#def find_max_frequency(f, **kwargs):
-#    """
-#    find extrema contained in f and returns
-#    N_pp,k_pp,maxmins,diffMaxmins
-#
-#    N_pp : int, f.size
-#    k_pp : int, number of extrema found
-#    maxmins: array of integer (size k_pp), index (location) of extrema
-#    diffMaxmins: array of integer (size k_pp -1): distance between neighbohr extrema
-#    """
-#    
-#    maxmins = Maxmins(f,**kwargs)
-#    if len(maxmins) < 1:
-#        print('No extrema detected')
-#        return None,None
-#    
-#    diffMaxmins = np.diff(maxmins)
-#    
-#    N_pp = len(f)
-#    k_pp = maxmins.shape[0]
-#
-#    return N_pp, k_pp, maxmins, diffMaxmins
-#
-#
-#def get_mask_length(options,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs):
-#    
-#    if isinstance(options.alpha,str):
-#    
-#        if options.alpha == 'ave': 
-#            m = 2*np.round(N_pp/k_pp*options.Xi)
-#        elif options.alpha == 'Almost_min': 
-#            m = 2*np.min( [options.Xi*np.percentile(diffMaxmins_pp,30), np.round(N_pp/k_pp*options.Xi)])
-#        elif options.alpha == 'Median':
-#            m = 2*np.round(np.median(diffMaxmins_pp)*options.Xi)
-#        else:    
-#            raise Exception('Value of alpha not recognized!\n')
-#    
-#    else:
-#        m = 2*np.round(options.Xi*np.percentile(diffMaxmins_pp,options.alpha))
-#    
-#    if countIMFs > 1:
-#        if m <= logM:
-#            if options.verbose:
-#                print('Warning mask length is decreasing at step %1d. ' % countIMFs)
-#            if options.MonotoneMaskLength:
-#                m = np.ceil(logM * 1.1)
-#                if options.verbose:
-#                    print('The old mask length is %1d whereas the new one is forced to be %1d.\n' % (
-#                    logM, m))
-#            else:
-#                if options.verbose:
-#                    print('The old mask length is %1d whereas the new one is %1d.\n' % (logM, m))
-#
-#    return m
-#
-#def get_mask_v1_1(y, k,verbose,tol):
-#    """
-#    Rescale the mask y so that its length becomes 2*k+1.
-#    k could be an integer or not an integer.
-#    y is the area under the curve for each bar
-#    
-#    wrapped from FIF_v2_13.m
-#    
-#    """
-#    n = np.size(y)
-#    m = (n-1)//2
-#    k = int(k)
-#
-#    if k<=m:
-#
-#        if np.mod(k,1) == 0:
-#            
-#            a = np.zeros(2*k+1)
-#            
-#            for i in range(1, 2*k+2):
-#                s = (i-1)*(2*m+1)/(2*k+1)+1
-#                t = i*(2*m+1)/(2*k+1)
-#
-#                s2 = np.ceil(s) - s
-#
-#                t1 = t - np.floor(t)
-#
-#                if np.floor(t)<1:
-#                    print('Ops')
-#
-#                a[i-1] = np.sum(y[int(np.ceil(s))-1:int(np.floor(t))]) +\
-#                         s2*y[int(np.ceil(s))-1] + t1*y[int(np.floor(t))-1]
-#        else:
-#            new_k = int(np.floor(k))
-#            extra = k - new_k
-#            c = (2*m+1)/(2*new_k+1+2*extra)
-#
-#            a = np.zeros(2*new_k+3)
-#
-#            t = extra*c + 1
-#            t1 = t - np.floor(t)
-#
-#            if k<0:
-#                print('Ops')
-#                a = []
-#                return a
-#
-#            a[0] = np.sum(y[:int(np.floor(t))]) + t1*y[int(np.floor(t))-1]
-#
-#            for i in range(2, 2*new_k+3):
-#                s = extra*c + (i-2)*c+1
-#                t = extra*c + (i-1)*c
-#                s2 = np.ceil(s) - s
-#                t1 = t - np.floor(t)
-#
-#                a[i-1] = np.sum(y[int(np.ceil(s))-1:int(np.floor(t))]) +\
-#                         s2*y[int(np.ceil(s))-1] + t1*y[int(np.floor(t))-1]
-#            t2 = np.ceil(t) - t
-#
-#            a[2*new_k+2] = np.sum(y[int(np.ceil(t))-1:n]) + t2*y[int(np.ceil(t))-1]
-#
-#    else: # We need a filter with more points than MM, we use interpolation
-#        dx = 0.01
-#        # we assume that MM has a dx = 0.01, if m = 6200 it correspond to a
-#        # filter of length 62*2 in the physical space
-#        f = y/dx
-#        dy = m*dx/k
-#        # b = np.interp(list(range(1,int(m+1),m/k)), list(range(0,int(m+1))), f[m:2*m+1])
-#        b = np.interp(np.linspace(0,m,int(np.ceil(k+1))), np.linspace(0,m,m+1), f[m:2*m+1])
-#
-#        a = np.concatenate((np.flipud(b[1:]), b))*dy
-#
-#        if abs(LA.norm(a,1)-1)>tol:
-#            if verbose:
-#                print('\n\n Warning!\n\n')
-#                print(' Area under the mask equals %2.20f\n'%(LA.norm(a,1),))
-#                print(' it should be equal to 1\n We rescale it using its norm 1\n\n')
-#            a = a/LA.norm(a,1)
-#        
-#    return a
-
-#def compute_imf_numba(f,a,options):
-#        
-#    h = np.array(f)
-#    h_ave = np.zeros(len(h))
-#
-#    @njit(parallel=True)
-#    def iterate_numba(h,h_ave,kernel,delta,MaxInner):
-#        
-#        inStepN = 0
-#        SD = 1.
-#        
-#        ker_size = len(kernel)
-#        hker_size = ker_size//2
-#        #kernel[hker_size] -=1 #so we get the high frequency filter 
-#        
-#        Nh = len(h)
-#        while SD>delta and inStepN<MaxInner:
-#            inStepN += 1
-#            #convolving the function with the mask: High Pass filter
-#            #convolving edges (influence cone)
-#            for i in prange(hker_size):
-#                for j in range(i+hker_size+1): 
-#                    h_ave[i] += h[j] * kernel[hker_size-i+j] 
-#                    h_ave[-i-1] += h[-j-1] * kernel[hker_size+i-j] 
-#            #convolving inner part
-#            for i in prange(hker_size, Nh - hker_size):
-#                for j in range(ker_size): h_ave[i] += h[i-hker_size+j] * kernel[j] 
-#
-#            #computing norm
-#            SD =  0
-#            hnorm = 0
-#            for i in range(Nh):
-#                SD+= h_ave[i]**2
-#                hnorm+= h[i]**2
-#            SD /=hnorm
-#            h[:] = h[:] - h_ave[:]
-#            h_ave[:] = 0
-#        
-#        return h,inStepN,SD
-#
-#    h_ave, inStepN, SD = iterate_numba(h,h_ave,a,options.delta,options.MaxInner)
-#    
-#    if options.verbose:
-#        print('(numba): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
-#
-#    return h_ave,inStepN,SD
-#
-#def compute_imf_fft(f,a,options):
-#        
-#    from scipy.signal import fftconvolve
-#
-#    h = np.array(f)
-#    h_ave = np.zeros(len(h))
-#
-#    kernel = a
-#    delta = options.delta
-#    MaxInner = options.MaxInner
-#    
-#        
-#    inStepN = 0
-#    SD = 1.
-#    
-#    Nh = len(h)
-#    while SD>delta and inStepN<MaxInner:
-#        inStepN += 1
-#        h_ave = fftconvolve(h,kernel,mode='same')
-#        #computing norm
-#        SD = LA.norm(h_ave)**2/LA.norm(h)**2
-#        h[:] = h[:] - h_ave[:]
-#        h_ave[:] = 0
-#        if options.verbose:
-#            print('(fft): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
-#    
-#
-#    
-#    if options.verbose:
-#        print('(fft): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
-#
-#    return h,inStepN,SD
-
-#def _compute_imf_fft_adv(f,a,options):
-#    """
-#    next step is doing the norm calculation in Fourier space so to reduce 
-#    to only 2 FFTs
-#    """
-#    from scipy.signal.signaltools import _init_freq_conv_axes, _centered
-#    from scipy import fft as sp_fft
-#    
-#    h = np.array(f)
-#    h_ave = np.zeros(len(h))
-#
-#    kernel = a
-#    delta = options.delta
-#    MaxInner = options.MaxInner
-#    
-#        
-#    inStepN = 0
-#    SD = 1.
-#    
-#    Nh = len(h)
-#    #setting machinery for fftconvolve directly wrapped from scipy.signal.signaltools
-#    in1 = h; in2 = kernel
-#    if in1.ndim == in2.ndim == 0:  # scalar inputs
-#        return in1 * in2
-#    elif in1.size == 0 or in2.size == 0:  # empty arrays
-#        return np.array([])
-#    in1, in2, axes = _init_freq_conv_axes(in1, in2, 'same', None,
-#                                          sorted_axes=False)
-#    s1 = in1.shape
-#    s2 = in2.shape
-#
-#    shape = [max((s1[i], s2[i])) if i not in axes else s1[i] + s2[i] - 1
-#             for i in range(in1.ndim)]
-#    
-#    calc_fast_len=True
-#    if not len(axes):
-#        return in1 * in2
-#
-#    complex_result = (in1.dtype.kind == 'c' or in2.dtype.kind == 'c')
-#
-#    if calc_fast_len:
-#        # Speed up FFT by padding to optimal size.
-#        fshape = [
-#            sp_fft.next_fast_len(shape[a], not complex_result) for a in axes]
-#    else:
-#        fshape = shape
-#
-#    if not complex_result:
-#        fft, ifft = sp_fft.rfftn, sp_fft.irfftn
-#    else:
-#        fft, ifft = sp_fft.fftn, sp_fft.ifftn
-#
-#    #sp1 = fft(in1, fshape, axes=axes)
-#    sp2 = fft(in2, fshape, axes=axes)
-#
-#    
-#    while SD>delta and inStepN<MaxInner:
-#        inStepN += 1
-#        sp1 = fft(in1, fshape, axes=axes)
-#        ret = ifft(sp1 * sp2, fshape, axes=axes)
-#        if calc_fast_len:
-#            fslice = tuple([slice(sz) for sz in shape])
-#            ret = ret[fslice]
-#    
-#        h_ave =  _centered(ret, s1).copy() 
-#
-#        #computing norm
-#        SD = LA.norm(h_ave)**2/LA.norm(h)**2
-#        h[:] = h[:] - h_ave[:]
-#        h_ave[:] = 0
-#        if options.verbose:
-#            print('(fft adv): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
-#    
-#
-#    
-#    if options.verbose:
-#        print('(fft adv): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
-#
-#    return h,inStepN,SD
 ################################################################################
 ###################### Iterative Filtering main functions ######################
 ################################################################################
 
 def Settings(**kwargs):
     """
-    Sets the default options to be passed to xFIF
+    Sets the default options to be passed to IF
     WARNING: NO CHECK IS DONE ON THE VALIDITY OF THE INPUT
     
-    WRAPPED FROM: Settings_v3.m
-    NOTE:
-    selecting options['imf_method'] = fft should be equivalent to do FIF
     """
 
     options = {}
     # General 
     #options['saveEnd'] = 0
     #options['saveInter'] = 0
-    options['stdout'] = False
-    options['verbose'] = False    
-    options['timeit'] = False    
+    options['stdout'] = False  #if True, print output to stdout
+    options['verbose'] = False #toggle verbosity level.
+    options['timeit'] = False  #Toggle timing of calculations
     #options['plots'] = 0.0
     #options['saveplots'] = 0     
         
-    # FIF
-    options['delta'] = 0.001
-    options['ExtPoints']=3
-    options['NIMFs']=200
-    options['Xi']=1.6
-    options['alpha']='ave'
-    options['MaxInner']=200
-    options['MonotoneMaskLength']=True
-    options['NumSteps']=1
-    options['BCmode'] = 'clip' #wrap
-    options['Maxmins_method'] = 'zerocrossing'
-    options['imf_method'] = 'fft' #numba
-    options['MaxlogM'] = None
+    # FIF   #SC == Stopping criterion (convergence)
+    options['delta'] = 0.001 #SC1: threshold in the difference of 2Norm 
+    options['ExtPoints']=3 #SC2: minimum number of extrema
+    options['NIMFs']=200 #SC3: maximum number of IMF to be extracted
+    options['MaxInner']=200 #SC4: maximum number of iterations
+    
+    options['Xi']=1.6 #stretching factor of the mask
+    options['alpha']='ave' #sets how to calculate the masklength from freq. distribution
+    options['MonotoneMaskLength']=True #sets if a monotone mask length is forced
+    options['NumSteps']=1 #number of internal steps in IF loop between two FFTs
+    options['BCmode'] = 'clip' #BCmode: boundary of the signal (if periodic is 'wrap')
+    options['Maxmins_method'] = 'zerocrossing' #see Maxmins in IF_aux
+    options['imf_method'] = 'fft' #numba #select the numerical method for computation
+    options['MaxlogM'] = None # Maximum allowed mask length (If None then this value is
+                              # automatically set to the length of the timeseries.
     for i in kwargs:
         if i in options.keys() : options[i] = kwargs[i] 
     return AttrDictSens(options)
@@ -434,25 +60,39 @@ def FIF_run(x, options=None, M = np.array([]),**kwargs):
     if options is None:
         options = Settings()
     
-    return IF_v8_3e(x,options,M=M,**kwargs)
+    return IterativeFiltering(x,options,M=M,**kwargs)
 
 
-def IF_v8_3e(f,options,M=np.array([]), window_mask=None, data_mask = None, nthreads = None):
+def IterativeFiltering(f,options,M=np.array([]), window_mask=None, data_mask = None, nthreads = None):
 
     """
     Iterative Filtering python implementation (version 8) Parallel version
     adapted from MvFIF_v8.m
-    
-    INPUT: x: array-like, shape(D,N)
-        
-        THE REST OF THE CRAZY INPUT IS AS USUAL :P
+   
+    Parameters
+    ----------
 
-        the FIF decomposition is along N, and the analysis is performed on
-        D channels/signals at once omogenizing the window size to be the same
-        i.e., it is a concurrent decomposition
+    f : 1D array-like (size N)
+        input timeseries
+    options : dict
+        dictionary containing the options of the IF decomposition (see Settings)
+    
+    Parameters (optional)
+    ---------------------
+
+    M : np.array 
+        if not empty, the length of the mask for each imf is imposed by M
+    
+    window_mask : None or 1D-array
+        window mask to be used to calculate the window function with variable length set
+        by logM in the code (via interpolation)
 
     data_mask : None or boolean array of size x
         used to mask data that wont be used to determine the size of the window mask (LogM).
+        if not None, then the indices where data_mask is True are not used to calculate the
+        maximum frequency contained in the signal
+    nthreads : int or None
+        number of threads to be used in the numba implementation
     """
     ssend = '\r'
     opts = AttrDictSens(options)
@@ -503,7 +143,8 @@ def IF_v8_3e(f,options,M=np.array([]), window_mask=None, data_mask = None, nthre
 
     #Find max-frequency contained in signal
     if ift: ttime.tic 
-    N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
+    f_pp = np.delete(f,data_mask) if data_mask is not None else f
+    N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f_pp,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
     if ift: time_max_nu += ttime.get_toc
 
     countIMFs = 0
@@ -536,8 +177,6 @@ def IF_v8_3e(f,options,M=np.array([]), window_mask=None, data_mask = None, nthre
             print('\n IMF # %1.0d   -   # Extreme points %5.0d\n' %(countIMFs,k_pp))
             print('\n  step #            SD             Mask length \n\n')
 
-        #stats = {'logM': [], 'inStepN': []}
-        #stats['logM'].append(int(m))
         stats_list[countIMFs-1].logM = int(m)
         logM = int(m)
         
@@ -553,7 +192,6 @@ def IF_v8_3e(f,options,M=np.array([]), window_mask=None, data_mask = None, nthre
         if inStepN >= opts.MaxInner:
             if opts.stdout : print('Max # of inner steps reached')
 
-        #stats['inStepN'].append(inStepN)
         stats_list[countIMFs-1].inStepN = inStepN
         
         IMF[countIMFs-1, :] = h
@@ -562,10 +200,10 @@ def IF_v8_3e(f,options,M=np.array([]), window_mask=None, data_mask = None, nthre
     
         #Find max-frequency contained in residual signal
         if ift: ttime.tic 
-        N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
+        f_pp = np.delete(f,data_mask) if data_mask is not None else f
+        N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f_pp,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
         if ift: time_max_nu += ttime.get_toc
         
-        #stats_list.append(stats)
 
     IMF = IMF[0:countIMFs, :]
     IMF = np.vstack([IMF, f[:]])

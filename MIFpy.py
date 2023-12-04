@@ -25,7 +25,7 @@ import timeit
 from numba import jit,njit,prange,get_num_threads,set_num_threads
 from attrdict import AttrDict as AttrDictSens
 
-from .IF_aux import Maxmins, FKmask, fftconvolve2D, find_max_frequency2D, \
+from .IF_aux import Maxmins, FKmask, find_max_frequency2D, \
     get_mask_length2D, get_mask_2D_v3, compute_imf2d_fft, _compute_imf2d_fft_adv
 
 __version__='3e'

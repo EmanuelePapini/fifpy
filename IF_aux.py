@@ -1,7 +1,7 @@
 """
  Iterative Filtering python package: general auxiliary functions
 
- Dependencies : numpy, scipy, numba, attrdict  //TO CHECK
+ Dependencies : numpy, scipy, numba  
 
  Authors: 
     Python version: Emanuele Papini - INAF (emanuele.papini@inaf.it) 
@@ -17,22 +17,10 @@ from scipy.signal import argrelextrema
 from numpy import fft
 from numba import jit,njit,prange,get_num_threads,set_num_threads
 
-#THIS is a full substitute for my custom class that doesn't perform very well
-from attrdict import AttrDict as AttrDictSens
 
 from .prefixed_double_filter import MM as FKmask
 FKmask = np.array(FKmask)
 
-def get_window_file_path():
-    """
-    This function is no more used and should be deleted
-    """
-    import sys
-    _path_=sys.modules[__name__].__file__.split(sep='/')
-    pp=_path_[0]
-    for ipath in _path_[1:-1]:
-        pp+='/'+ipath
-    return pp+'/prefixed_double_filter.mat'
 
 @njit
 def lanorm(x,ordd):
@@ -40,13 +28,25 @@ def lanorm(x,ordd):
 
 def Maxmins(x, tol = 1e-12, mode = 'clip', method = 'zerocrossing'):
     """
+    Finds the indices of the extrema (maxima and minima) contained in x, or 
+    in it derivative (if 'zerocrossing' is selected.
+    
+    Parameters
+    ----------
+
+    x : 1D-array like
+        array of the signal to find the extrema of
+    tol : float
+        used if 'zerocrossing' method is selected (see below)
+    mode : str
+        type of boundary conditions (see scipy.signal.argrelextrema)
+        only works with method 'argrelextrema'
     method: str
         'argrelextrema': compute maxima and minima using argrelextrema. Ignores tol
         'zerocrossing' : compute maxima and minima using zero crossing of 1st derivative.
                          If diff through the crossing is less than tol, the point is ignored. 
     """
     if method == 'argrelextrema':
-        from scipy.signal import argrelextrema
         maxima = argrelextrema(x, np.greater, mode = mode)
         minima = argrelextrema(x, np.less, mode = mode)
 
@@ -69,11 +69,21 @@ def find_max_frequency(f, **kwargs):
     """
     find extrema contained in f and returns
     N_pp,k_pp,maxmins,diffMaxmins
+    
+    parameters
+    ----------
+    f : 1D array-like
+        input array of which to find the max frequency
 
+    **kwargs: optional parameters to be passed to Maxmins
+
+    returns
+    -------
     N_pp : int, f.size
     k_pp : int, number of extrema found
     maxmins: array of integer (size k_pp), index (location) of extrema
     diffMaxmins: array of integer (size k_pp -1): distance between neighbohr extrema
+    
     """
     
     maxmins = Maxmins(f,**kwargs)
@@ -91,7 +101,41 @@ def find_max_frequency(f, **kwargs):
 
 
 def get_mask_length(options,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs):
+    """
+    Compute the mask length (in points) given a certain set of input parameters
     
+    The input parameters are the one given by find_max_frequency
+    
+    parameters
+    ----------
+    options : dict
+        dict containing at least the following mandatory keys
+        'alpha' : str or float
+            'ave': the mask length is computed using the average frequency
+                i.e. 2*N_pp/k_pp*options.Xi
+            'Almost_min' : compute the mask length using the minimum between
+                the 'ave' formula and 30th-percentile diffMaxmins_pp
+            'Median' : compute the mask length using the median of the distribution of 
+                diffMaxmins_pp multiplied by the stretching factor options.Xi
+            float: compute the mask length using the percentile specified in options['alpha']
+                then multiplied by the stretching factor options['Xi']
+        'Xi' : float
+            stretching factor for computing the mask length
+
+    N_pp : int
+        length of the signal in term of points. (aka, its size)
+    k_pp : int
+        number of extrema present in the signal 
+    diffMaxmins: array of integer (size k_pp -1) 
+        distance between neighbohr extrema
+    logM : int
+        minimum mask-length allowed. If the mask length is found to be less than logM,
+        then override the value of the new length to logM*1.1
+    countIMF : int
+        number of the ith IMF (IMC) that we are actually computing
+        if countIMF <= 1, the logM argument is not used, and the computed mask is returned.
+    """
+
     if isinstance(options.alpha,str):
     
         if options.alpha == 'ave': 
@@ -124,7 +168,7 @@ def get_mask_length(options,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs):
 def get_mask_v1_1(y, k,verbose,tol):
     """
     Rescale the mask y so that its length becomes 2*k+1.
-    k could be an integer or not an integer.
+    k could be either an integer or a float.
     y is the area under the curve for each bar
     
     wrapped from FIF_v2_13.m
@@ -207,7 +251,13 @@ def get_mask_v1_1(y, k,verbose,tol):
 ################################################################################
 
 def compute_imf_numba(f,a,options):
-        
+    """
+    Extracts the imf from the signal f using the window function (mask) a,
+    according to the settings specified in the options dict
+    
+    N.B. This calculation is done via convolution of f with a in normal space,
+    using numba to accelerate the computations.
+    """
     h = np.array(f)
     h_ave = np.zeros(len(h))
 
@@ -254,6 +304,18 @@ def compute_imf_numba(f,a,options):
     return h_ave,inStepN,SD
 
 def compute_imf_fft(f,a,options):
+    """
+    Extracts the imf from the signal f using the window function (mask) a,
+    according to the settings specified in the options dict
+    
+    N.B. This calculation is done via convolution of f with a in Fourier space,
+    using scipy.signal.fftconvolve
+    
+    mandatory keyword in options:
+    'delta' : minimum difference in the 2norm between the two iterations
+    'MaxInner': maximum number of iterations
+    'verbose' : verbosity level 
+    """
         
     from scipy.signal import fftconvolve
 
@@ -289,6 +351,7 @@ def compute_imf_fft(f,a,options):
 def compute_imf_fft_adv(f,a,options):
     """
     slightly faster since it spares the calculation of 1fft per iteration
+    WARNING: IT DOESN'T WORK FOR SCIPY NEW VERSIONS (python>3.10.xx) 
     """
     from scipy.signal.signaltools import _init_freq_conv_axes, _centered
     from scipy import fft as sp_fft
@@ -369,11 +432,23 @@ def compute_imf_fft_adv(f,a,options):
 #################### MIF SPECIFIC AUXILIARY FUNCTIONS ##########################
 ################################################################################
 
-def fftconvolve2D(f,ker, mode = 'same', BCmode = 'wrap'):
+def fftconvolve2D(f,ker):#, mode = 'same', BCmode = 'wrap'):
     """
-    h_ave = fftconvolve2D(h,kernel,mode='same',BC)
+    
+    Compute the 2D convolution between f and ker, using fft.
+    
+    It assumes that the field is biperiodic
+
     SO FAR only mode = 'same' and BCmode = 'wrap' are implemented
     maybe use pylab_convolve2D for direct convolution
+    
+    parameters
+    ----------
+    f : 2D-like array
+        input array
+    ker : 2D-like array
+        kernel of the convolution filter
+
     """
     if any([i<j for i,j in zip(f.shape,ker.shape)]):
         print('error, kernel shape cannot be larger than 2D array shape')
@@ -547,7 +622,7 @@ def compute_imf2d_fft(f,a,options):
     Nh = len(h)
     while SD>delta and inStepN<MaxInner:
         inStepN += 1
-        h_ave = fftconvolve2D(h,kernel,mode='same', BCmode = 'wrap')
+        h_ave = fftconvolve2D(h,kernel)#,mode='same', BCmode = 'wrap')
         #computing norm
         SD = LA.norm(h_ave)**2/LA.norm(h)**2
         h = h[...] - h_ave[...]
