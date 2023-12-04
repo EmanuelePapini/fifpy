@@ -35,8 +35,6 @@ _path_=sys.modules[__name__].__file__[0:-11]
 
 class FIF():
     """
-    WARNING: This is an experimental version with minimal explanation.
-    Should you need help, please contact Emanuele Papini (emanuele.papini@inaf.it) 
 
     Python class of the (Fast) Iterative Filtering (FIF) method  
     
@@ -47,10 +45,10 @@ class FIF():
         x = np.linspace(0,2*np.pi,100,endpoint=False)
         y = np.sin(2*x) + np.cos(10*x+2.3)
         
-        #do the FIF analysis
-        import fifpy as FIF
-    
-        fif=FIF.FIF()
+        #do the fifpy analysis
+        import fifpy 
+
+        fif=fifpy.FIF()
 
         fif.run(y)
 
@@ -61,51 +59,42 @@ class FIF():
         plt.plot(x,y,label='signal')
         [plt.plot(x,fif.data['IMC'][i,:],label = 'IMC#'+str(i)) for i in range(fif.data['IMC'].shape[0])]
         plt.legend(loc='best')
+    
+    WARNING: This class is not fully documented nor error proof.
+    Should you need help, please contact Emanuele Papini (emanuele.papini@inaf.it) 
 
-    Eventual custom settings (e.g. Xi, delta and so on) must be specified at the time of initialization
-    (see __init__ below)
-    Original matlab header
-    % It generates the decomposition of the signal f :
-    %
-    %  f = IMF(1,:) + IMF(2,:) + ... + IMF(K, :)
-    %
-    % where the last row in the matrix IMF is the trend and the other rows
-    % are actual IMFs
-    %
-    %                                Inputs
-    %
-    %   f         Signal to be decomposed
-    %
-    %
-    %   M         Mask length values for each Inner Loop
-    %
-    %                               Output
-    %
-    %   IMF       Matrices containg in row i the i-th IMF. The last row
-    %              contains the remainder-trend.
-    %
-    %   logM      Mask length values used for each IMF
-    %
-    %   See also SETTINGS_IF_V1, GETMASK_V1, MAXMINS_v3_4, PLOT_IMF_V8.
-    %
-    %  Ref: A. Cicone, J. Liu, H. Zhou. 'Adaptive Local Iterative Filtering for 
-    %  Signal Decomposition and Instantaneous Frequency analysis'. Applied and 
-    %  Computational Harmonic Analysis, Volume 41, Issue 2, September 2016, 
-    %  Pages 384-411. doi:10.1016/j.acha.2016.03.001
-    %  ArXiv http://arxiv.org/abs/1411.6051
-    %
-    %  A. Cicone. 'Nonstationary signal decomposition for dummies'. 
-    %  Chapter in the book: Advances in Mathematical Methods and High 
-    %  Performance Computing. Springer, 2019
-    %  ArXiv https://arxiv.org/abs/1710.04844
-    %
-    %  A. Cicone, H. Zhou. 'Numerical Analysis for Iterative Filtering with 
-    %  New Efficient Implementations Based on FFT'
-    %  ArXiv http://arxiv.org/abs/1802.01359
-    %
+    Eventual settings (e.g. Xi, delta and so on) must be specified at the time of initialization
     
     Init Parameters 
-
+    delta : float (default 0.001)
+        Stopping criterion based on the 2norm difference threshold between the nth 
+        and the nth-1 high-pass-filtered signal in the iteration.
+        Iteration stops if 2norm(nth) -2norm(nth-1) <=delta
+    ExtPoints : int (default 3)
+        Stopping criterion.
+        Stops the IMCs extraction/calculation if the extrema (maxima+minima) in the 
+        residual signal to be analyzed are <= ExtPoints
+    NIMFs : int (default 200)
+        Stopping criterion
+        Maximum number of IMCs to be extracted.
+    Xi : float (default 1.6)
+        Stretching factor of the mask/window-function length
+    alpha : str or int (default 'ave')
+        sets how to calculate the (half) mask length of the IMCs
+        int: 0 to 100: take as half mask length the "alpha" percentile of the distribution of
+             distances between extrema found in the signal
+        'ave': take as half mask length the number of points in the signal (N) divided by
+            the number of extrema.
+        'Almost_min': take the minimum between the 305h percentile of the distribution and 'ave'
+    MaxInner : int (default 200)
+        Stopping criterion. The maximum number of iterations allowed in the extraction of one IMC
+    MonotoneMaskLength : bool (default True)
+        If True, the mask length of the next IMCs is forced to be 1.1*mask length of the current one if
+        the mask length calculation return a smaller length.
+    NumSteps : int (default 1)
+        number of steps to do in the iteration between the check of the 2norm difference (see delta)
+    verbose : bool (default False)
+        toggle verbosity
 
     """
 
@@ -129,7 +118,24 @@ class FIF():
         self.ancillary = {}
     
     def run(self, in_f, M=np.array([]), wshrink = 0,**kwargs):
+        """
+        Run the decomposition
+        
+        Parameters
+        ----------
+        in_f : 1d array of float
+            input signal to be decomposed
+        M : list of int (optional)
+            list of mask lengths to be used (optional). 
+            NOTE: this will force the decomposition to use predefined mask lengths.
+        wshrink : int
+            number of points to exclude from the output (used to exclude, e.g. periodic extensions
+            of the original signal).
 
+        **kwargs: dict
+            optional kwargs to be passed to FIFpy.FIF_run
+
+        """
         self.data = {}
         
         self.data['IMC'], self.data['stats_list'] = self.FIFpy.FIF_run(in_f, M = M,\
@@ -141,40 +147,46 @@ class FIF():
 
     @property
     def input_timeseries(self):
+        """
+        return the input timeseries (including extension)
+        """
         return np.sum(self.data['IMC'],axis=0)
+    
     @property
     def IMC(self):
+        """
+        Return the extracted IMCs (excluding the extension)
+        """
         return self.data['IMC'][:,self.wsh:-self.wsh] if self.wsh >0 else self.data['IMC'] 
 
-    def get_inst_freq_amp(self,dt, as_output = False ):
-        """
-        get instantaneous frequencies and amplitudes of the IMCs
-        if as_output is true, it returns the result instead of adding it to data
-        THIS METHOD IS DEPRECATED SINCE IT DOESN'T USE wshrink.
-        PLEASE USE get_freq_amplitudes instead
-        """
-        
-        if as_output:
-            return ftools.IMC_get_inst_freq_amp(self.data['IMC'],dt)
-        
-        self.data['IMC_inst_freq'], self.data['IMC_inst_amp'] = ftools.IMC_get_inst_freq_amp(self.data['IMC'],dt)
+    #def get_inst_freq_amp(self,dt, as_output = False ):
+    #    """
+    #    get instantaneous frequencies and amplitudes of the IMCs
+    #    if as_output is true, it returns the result instead of adding it to data
+    #    THIS METHOD IS DEPRECATED SINCE IT DOESN'T USE wshrink.
+    #    PLEASE USE get_freq_amplitudes instead
+    #    """
+    #    
+    #    if as_output:
+    #        return ftools.IMC_get_inst_freq_amp(self.data['IMC'],dt)
+    #    
+    #    self.data['IMC_inst_freq'], self.data['IMC_inst_amp'] = ftools.IMC_get_inst_freq_amp(self.data['IMC'],dt)
 
 
     def get_freq_amplitudes(self, as_output = False, use_instantaneous_freq = True,  **kwargs):
         """
         see fif_tools.IMC_get_freq_amplitudes for a list of **kwargs
 
+        as_output : bool
+            self-explaining
+        use_instantaneous_freq = True : bool
+            use the instantaneous freq. to compute the average freq of the IMC
+        
         the available **kwargs should be
             dt = 1. : float 
                 grid resolution (inverse of the sampling frequency) 
             resort = False : Bool
                 if true, frequencies and amplitudes are sorted frequency-wise
-            wshrink = 0 : int 
-                only IMC[:,wshrink:-wshrink+1] will be used to compute freqs and amps.
-                To use if one needs to throw away the part of the IMC that goes, e.g.,
-                into the periodicization
-            use_instantaneous_freq = True : bool
-                use the instantaneous freq. to compute the average freq of the IMC
                 
         """
         wsh = self.ancillary['wshrink']
@@ -188,7 +200,15 @@ class FIF():
         if as_output: return self.data['freqs'], self.data['amps']
 
     def orthogonalize(self,threshold = 0.6, only_nearest = True, **kwargs):
-        
+        """
+        check orthogonality between IMCs and orthogonalize the set by aggregating non-orthogonal IMCs,
+        i.e. IMCs for which
+
+            <IMCs[i]*IMCs[j]> / (<IMCs[i]**2> * <IMCs[j]**2>) >= 0.6
+
+        where <...> is the inner product (i.e. the integral).
+
+        """
         if self.data['IMC'].shape[0] <3: #if shape==2 then only one imf was extracted
             return
         IMCs = self.data['IMC']
@@ -208,8 +228,39 @@ class MvFIF(FIF):
     
     (see Cicone and Pellegrino, IEEE Transactions on Signal Processing, vol. 70, pp. 1521-1531)
 
-    This is an experimental version with minimal explanation.
-    Should you need help, please contact Emanuele Papini (emanuele.papini@inaf.it) or Antonio Cicone (antonio.cicone@univaq.it)
+    WARNING: This class is not fully documented nor error proof.
+    Should you need help, please contact Emanuele Papini (emanuele.papini@inaf.it) 
+    
+    Init Parameters 
+    delta : float (default 0.001)
+        Stopping criterion based on the 2norm difference threshold between the nth 
+        and the nth-1 high-pass-filtered signal in the iteration.
+        Iteration stops if 2norm(nth) -2norm(nth-1) <=delta
+    ExtPoints : int (default 3)
+        Stopping criterion.
+        Stops the IMCs extraction/calculation if the extrema (maxima+minima) in the 
+        residual signal to be analyzed are <= ExtPoints
+    NIMFs : int (default 200)
+        Stopping criterion
+        Maximum number of IMCs to be extracted.
+    Xi : float (default 1.6)
+        Stretching factor of the mask/window-function length
+    alpha : str or int (default 'ave')
+        sets how to calculate the (half) mask length of the IMCs
+        int: 0 to 100: take as half mask length the "alpha" percentile of the distribution of
+             distances between extrema found in the signal
+        'ave': take as half mask length the number of points in the signal (N) divided by
+            the number of extrema.
+        'Almost_min': take the minimum between the 305h percentile of the distribution and 'ave'
+    MaxInner : int (default 200)
+        Stopping criterion. The maximum number of iterations allowed in the extraction of one IMC
+    MonotoneMaskLength : bool (default True)
+        If True, the mask length of the next IMCs is forced to be 1.1*mask length of the current one if
+        the mask length calculation return a smaller length.
+    NumSteps : int (default 1)
+        number of steps to do in the iteration between the check of the 2norm difference (see delta)
+    verbose : bool (default False)
+        toggle verbosity
     """
 
     def __init__(self, delta=0.001, alpha=30, NumSteps=1, ExtPoints=3, NIMFs=200, \
@@ -230,35 +281,23 @@ class MvFIF(FIF):
     
     @property
     def IMC(self):
+        """
+        return the input timeseries (including extension)
+        """
         return self.data['IMC'][:,:,self.wsh:-self.wsh] if self.wsh >0 else self.data['IMC'] 
-
-
-    def get_inst_freq_amp(self,dt, as_output = False ):
-        """
-        get instantaneous frequencies and amplitudes of the IMCs
-        if as_output is true, it returns the result instead of adding it to data
-        """
-        
-        if as_output:
-            return ftools.IMC_get_inst_freq_amp(np.squeeze(self.data['IMC'][:,0,:]),dt)
-        
-        self.data['IMC_inst_freq'], self.data['IMC_inst_amp'] = \
-            ftools.IMC_get_inst_freq_amp(np.squeeze(self.data['IMC'][:,0,:]),dt)
-
 
     def get_freq_amplitudes(self, as_output = False, use_instantaneous_freq = True,  **kwargs):
         """
         see fif_tools.IMC_get_freq_amplitudes for a list of **kwargs
 
+        as_output : bool
+            self-explaining
+        
         the available **kwargs should be
             dt = 1. : float 
                 grid resolution (inverse of the sampling frequency) 
             resort = False : Bool
                 if true, frequencies and amplitudes are sorted frequency-wise
-            wshrink = 0 : int 
-                only IMC[:,wshrink:-wshrink+1] will be used to compute freqs and amps.
-                To use if one needs to throw away the part of the IMC that goes, e.g.,
-                into the periodicization
             use_instantaneous_freq = True : bool
                 use the instantaneous freq. to compute the average freq of the IMC
                 
@@ -282,6 +321,17 @@ class MvFIF(FIF):
         if as_output: return self.data['freqs'], self.data['amps']
 
     def orthogonalize(self,threshold = 0.6, only_nearest = True, **kwargs):
+        """
+        check orthogonality between IMCs and orthogonalize the set by aggregating non-orthogonal IMCs,
+        i.e. IMCs for which
+
+            <IMCs[i]*IMCs[j]> / (<IMCs[i]**2> * <IMCs[j]**2>) >= 0.6
+
+        where <...> is the inner product (i.e. the integral).
+        
+        The procedure is done on the single channels of the Mv signal, if one of them is found no to 
+        be orthogonal, e,g, IMCs[i,k] and IMCs[j,k], then all ith and jth IMCs (all k ) are aggregated.
+        """
         
         if self.data['IMC'].shape[0] <3: #if shape==2 then only one imf was extracted
             return
@@ -300,7 +350,7 @@ class IF(FIF):
     def __init__(self, **kwargs):
         """
         initialize Iterative Filtering Class.
-        For kwargs options please look at the Settings method in IF_v8_3e.py
+        For kwargs options please look at the Settings method in fifpy.IFpy
         """
 
 
@@ -314,13 +364,36 @@ class IF(FIF):
 
 
     
-    def run(self, in_f, M=np.array([]), wshrink = 0, preprocess = None,get_output = False,\
+    def run(self, in_f, M=np.array([]), wshrink = 0, preprocess = None, get_output = False,\
             data_mask = None,npad_raisedcos = None):
         """
+        Run the decomposition
+        
         Parameters
         ----------
+        
+        in_f : 1d array of float (size(N))
+            input signal to be decomposed
+        
         preprocess : str
             allowed values : 'make-periodic', 'extend-periodic', None
+        
+        M : list of int (optional)
+            list of mask lengths to be used (optional). 
+            NOTE: this will force the decomposition to use predefined mask lengths.
+        
+        wshrink : int
+            number of points to exclude from the output (used to exclude, e.g. periodic extensions
+            of the original signal).
+        get_output : bool
+            if True, it returns the output of the decomposition instead of saving it in self.data
+        data_mask :1D array of bool (size N)
+            if input, then the points where data_mask == True are excluded from the calculation
+            of the mask length. This is used, e.g. to deal with gaps that may be present in the data
+            which should be filled before starting the decomposition.
+        **kwargs: dict
+            optional kwargs to be passed to FIFpy.FIF_run
+
         """
         if preprocess == 'make-periodic':
             print('\nmaking input signal periodic...')
@@ -351,15 +424,15 @@ class IF(FIF):
         
 class MvIF(MvFIF):
     """
-    Advanced class for IF decompostion.
-    It contains all the core features of the IF class plus some methods
+    Advanced class for Multivariate IF decompostion.
+    It contains all the core features of the MvFIF class plus some methods
     to perform statistics over the computed IMCs.
     """
 
     def __init__(self, **kwargs):
         """
         initialize Iterative Filtering Class.
-        For kwargs options please look at the Settings method in IF_v8_3e.py
+        For kwargs options please look at the Settings method in fifpy.MvIFpy
         """
 
 
@@ -372,13 +445,35 @@ class MvIF(MvFIF):
         self.ancillary = {}
 
 
-    def run(self, in_f, M=np.array([]), wshrink = 0, preprocess = None,get_output = False,\
-            data_mask = None,npad_raisedcos = None):
+    def run(self, in_f, M=np.array([]), wshrink = 0, preprocess = None, get_output = False,\
+            data_mask = None, npad_raisedcos = None):
         """
         Parameters
         ----------
+        
+        in_f : 1d array of float (size(N))
+            input signal to be decomposed
+        
         preprocess : str
             allowed values : 'make-periodic', 'extend-periodic', None
+        
+        M : list of int (optional)
+            list of mask lengths to be used (optional). 
+            NOTE: this will force the decomposition to use predefined mask lengths.
+        wshrink : int
+            number of points to exclude from the output (used to exclude, e.g. periodic extensions
+            of the original signal).
+        get_output : bool
+            if True, it returns the output of the decomposition instead of saving it in self.data
+        data_mask :1D array of bool (size N)
+            if input, then the points where data_mask == True are excluded from the calculation
+            of the mask length. This is used, e.g. to deal with gaps that may be present in the data
+            which should be filled before starting the decomposition.
+        
+        npad_raisedcos : int or sequence of ints or None
+        number of points (from left and right boundary) where to apply the raised cosine.
+        If None, then npad = npad_raisedcos if 'make-periodic' or 'extend-periodic' are selected.
+
         """
         silent = self.options['silent']
         D,N = np.shape(in_f)
@@ -449,50 +544,12 @@ class MIF():
     Eventual custom settings (e.g. Xi, delta and so on) must be specified at the time of initialization
     (see __init__ below)
 
-    % It generates the decomposition of the signal f :
-    %
-    %  f = IMF(1,:) + IMF(2,:) + ... + IMF(K, :)
-    %
-    % where the last row in the matrix IMF is the trend and the other rows
-    % are actual IMFs
-    %
-    %                                Inputs
-    %
-    %   f         Signal to be decomposed
-    %
-    %
-    %   M         Mask length values for each Inner Loop
-    %
-    %                               Output
-    %
-    %   IMF       Matrices containg in row i the i-th IMF. The last row
-    %              contains the remainder-trend.
-    %
-    %   logM      Mask length values used for each IMF
-    %
-    %   See also SETTINGS_IF_V1, GETMASK_V1, MAXMINS_v3_4, PLOT_IMF_V8.
-    %
-    %  Ref: A. Cicone, J. Liu, H. Zhou. 'Adaptive Local Iterative Filtering for 
-    %  Signal Decomposition and Instantaneous Frequency analysis'. Applied and 
-    %  Computational Harmonic Analysis, Volume 41, Issue 2, September 2016, 
-    %  Pages 384-411. doi:10.1016/j.acha.2016.03.001
-    %  ArXiv http://arxiv.org/abs/1411.6051
-    %
-    %  A. Cicone. 'Nonstationary signal decomposition for dummies'. 
-    %  Chapter in the book: Advances in Mathematical Methods and High 
-    %  Performance Computing. Springer, 2019
-    %  ArXiv https://arxiv.org/abs/1710.04844
-    %
-    %  A. Cicone, H. Zhou. 'Numerical Analysis for Iterative Filtering with 
-    %  New Efficient Implementations Based on FFT'
-    %  ArXiv http://arxiv.org/abs/1802.01359
-    %
     """
 
     def __init__(self, **kwargs):
         """
         initialize Iterative Filtering Class.
-        For kwargs options please look at the Settings method in IF_v8_3e.py
+        For kwargs options please look at the Settings method in fifpy.MIFpy
         """
 
 
@@ -504,6 +561,18 @@ class MIF():
 
 
     def run(self, in_f, M=np.array([]),**kwargs):
+        """
+        Parameters
+        ----------
+        
+        in_f : 1d array of float (size(N))
+            input signal to be decomposed
+        
+        M : list of int (optional)
+            list of mask lengths to be used (optional). 
+            NOTE: this will force the decomposition to use predefined mask lengths.
+
+        """
 
         self.data = {}
         
@@ -512,9 +581,15 @@ class MIF():
 
     @property
     def input_field(self):
+        """
+        return the input field 
+        """
         return np.sum(self.data['IMC'],axis=0)
     @property
     def IMC(self):
+        """
+        return the result of the decomposition
+        """
         return self.data['IMC']#[:,self.wsh:-self.wsh] if self.wsh >0 else self.data['IMC'] 
     
 
@@ -532,7 +607,19 @@ class MIF():
             use_instantaneous_freq = True : bool
                 use the instantaneous freq. to compute the average freq of the IMC
                 
+        as_output : bool
+            self-explaining
+        use_instantaneous_freq = True : bool
+            use the instantaneous freq. to compute the average freq of the IMC
+        
+        the available **kwargs should be
+            dt = 1. : float 
+                grid resolution (inverse of the sampling frequency) 
+            resort = False : Bool
+                if true, frequencies and amplitudes are sorted frequency-wise
+                
         """
+        
         if nsamples is None: nsamples = self.options.Maxmins_samples
         
         self.data['freqs'], self.data['amps'] = \

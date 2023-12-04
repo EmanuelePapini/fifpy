@@ -3,12 +3,15 @@ from numba import jit, prange
 
 from scipy.integrate import trapz as integrate
 
-
-num_cpus=16
-
 def aggregate_IMCs(imfs,freqs,freq_ranges,return_mean_freq = False):
-
-    
+    """
+    aggregate 2D IMF according to frequency range given in input
+    The frequency range defines the limit.
+    i.e. if frequency range contains two frequencies [f1,f2]
+    then it returns 3 aggregate imf. one contaning freqs. bewteen 0 and f1,
+    the second between f1 and f2, and the last one containing all freqs.
+    >f2.
+    """
     agimfs=np.zeros((len(freq_ranges)+1,imfs.shape[1],imfs.shape[2]))
     mean_freqs = np.zeros(agimfs.shape[0])
     f0 = 0.
@@ -35,7 +38,6 @@ def check_orthogonality(imfs,periodic=True, plot=False):
     WORKS ONLY FOR 1D/2D IMCs. MUST BE IMPLEMENTED TO WORK WITH ND IMCs
 
     """
-    from scipy.integrate import trapz as integrate
 
     ndim = len(imfs.shape[1:])
 
@@ -111,7 +113,7 @@ def orthogonalize(imfs,threshold = 0.6, **kwargs):
 ##### SPECIFIC MvFIF tools #####
 def check_orthogonality_MvFIF(imfs,periodic=True, plot=False,only_nearest = False):
     """
-    WORKS ONLY FOR 1D multichannel IMCs as given in output by MvFIF
+    WORKS ONLY FOR 1D multichannel IMCs as given in output by MvFIF and MvIF
 
     """
     from scipy.integrate import trapz as integrate
@@ -202,73 +204,6 @@ def orthogonalize_MvFIF(imfs,threshold = 0.6, only_nearest = True, **kwargs):
         lowdiag = orto if only_nearest else orto[ilow,ilow-1]
          
     return imfst
-
-#def _postprocessing_IMF(IMF,eps = 1e-3):
-#    """
-#    %
-#    % postprocessing of the IMF
-#    %  INPUT:
-#    %       IMF : intrinsic mode functions as returned by MIF
-#    %       epsi: threshold parameter: if the difference between the average
-#    %             frequency of two IMFs falls below epsi, then sum the two IMFS
-#    %             into one only IMF.
-#    %
-#    %  OUTPUT:
-#    %
-#    %   IMF_pp: new processed IMFs (maybe less than the original imfs)
-#    %   fim_pp: averaged frequencies of each IMF
-#    %
-#    """
-#
-#    if len(IMF.shape) == 3:
-#        IMF_pp = []
-#        frq_pp = []
-#        for i in range(IMF.shape[0]):
-#            IMF_ppx,frq_ppx = _postprocessing_IMF(IMF[i,...].squeeze(),eps =eps)
-#            IMF_pp.append(IMF_ppx)
-#            frq_pp.append(frq_ppx)
-#        return IMF_pp, frq_pp
-#    else:
-#        N0 = len(IMF[0,:])
-#        M0 = len(IMF[:,0])
-#        fim0 = np.zeros(M0)
-#        for i in range(M0):
-#            maxmins = Maxmins_v3_6(IMF[i,:])
-#            fim0[i]=1/(2*np.round(N0/len(maxmins)))
-#        
-#        IMF_pp=[IMF[0,:].copy()]
-#        fim_pp=[fim0[0]]
-#        for i in range(1,M0):
-#            if (np.abs(fim0[i]-fim0[i-1]) < eps ) :
-#                IMF_pp[-1] += IMF[i,:]
-#            else:
-#                IMF_pp.append(IMF[i,:].copy())
-#                fim_pp.append(fim0[i])
-#        
-#        #IMF_pp.append(IMF[-1,:])
-#        #fim_pp.append(fim0[-1])
-#        return np.array(IMF_pp), np.array(fim_pp)
-
-
-#def IMC_get_freq_amplitude(IMF,dx = 1,eps = 0):
-#
-#
-#    try:
-#        imf_pp,fim_pp = _postprocessing_IMF(IMF,eps)
-#    except:
-#        print("error during frequency calculation, skipping computing frequencies")
-#        freq=-1
-#    else:
-#        nimfs,nx = IMF.shape
-#         
-#        freq=np.asarray(fim_pp)/dx
-#    
-#    amp0 = np.sqrt(integrate(imf_pp**2)*dx)  
-#
-#    if np.shape(IMF) == np.shape(imf_pp):
-#        return freq,amp0 
-#    else :
-#        return freq,amp0,imf_pp
 
 
 

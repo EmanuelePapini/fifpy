@@ -13,7 +13,6 @@
 
 
 import time
-#import pandas as pd
 import timeit
 from .IF_aux import *
 __version__='8.4'
