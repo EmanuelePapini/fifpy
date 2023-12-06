@@ -21,6 +21,9 @@ from numba import jit,njit,prange,get_num_threads,set_num_threads
 from .prefixed_double_filter import MM as FKmask
 FKmask = np.array(FKmask)
 
+from attrdict import AttrDict
+AttrDictSens = AttrDict
+
 
 @njit
 def lanorm(x,ordd):
