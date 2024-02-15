@@ -69,9 +69,10 @@ def MvFIF(x, options,M=np.array([]),data_mask = None):#delta, alpha, NumSteps, E
         i.e., it is a concurrent decomposition
     """
     print('running MvFIF decomposition...')
-    #unwrapping the options dict
-    for ikey in options:
-        locals()[ikey] = options[ikey]
+    #unpacking the options dict
+    locals().update(options)
+    #for ikey in options:
+    #    locals()[ikey] = options[ikey]
 
     if fft =='pyfftw':
         print('using pyfftw...')

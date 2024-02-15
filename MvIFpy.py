@@ -229,7 +229,7 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
         if ift: ttime.tic 
         inStepN = 0
         for ic in range(D):
-            if not silent: print('extracting IMF %d, CHANNEL %d (%d)\n'%(countIMFs,ic,D)) 
+            if not silent: print('extracting IMF %d, CHANNEL %d(%d), mask: %d\n'%(countIMFs,ic,D,m)) 
             hic, inStepNic, SDic = compute_imf(h[ic],a,opts)
             h[ic] = hic
             inStepN = np.max([inStepNic,inStepN])
