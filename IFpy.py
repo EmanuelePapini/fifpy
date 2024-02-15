@@ -111,8 +111,8 @@ def IterativeFiltering(f,options,M=np.array([]), window_mask=None, data_mask = N
     tol = 1e-18 
 
     if opts.imf_method == 'fft': 
-        #compute_imf = compute_imf_fft
-        compute_imf = compute_imf_fft_adv
+        compute_imf = compute_imf_fft
+        #compute_imf = compute_imf_fft_adv
     elif opts.imf_method == 'numba': 
         compute_imf = compute_imf_numba
 
@@ -163,7 +163,8 @@ def IterativeFiltering(f,options,M=np.array([]), window_mask=None, data_mask = N
         else:
             m = M[countIMFs-1]
         if N < 2*m+1: 
-            if opts.verbose: print('Mask length exceeds signal length. Finishing...')
+            if opts.verbose: 
+                print('Mask length %d exceeds signal length %d. Finishing...'%(2*m+1,N))
             countIMFs -= 1
             break
         if logM > MaxlogM:

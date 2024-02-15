@@ -328,7 +328,7 @@ def compute_imf_fft(f,a,options):
     kernel = a
     delta = options.delta
     MaxInner = options.MaxInner
-    
+    BCmod = options.BCmode 
         
     inStepN = 0
     SD = 1.
@@ -336,7 +336,10 @@ def compute_imf_fft(f,a,options):
     Nh = len(h)
     while SD>delta and inStepN<MaxInner:
         inStepN += 1
-        h_ave = fftconvolve(h,kernel,mode='same')
+        if BCmod == 'wrap':
+            h_ave = fftconvolve1D(h,kernel)
+        else:
+            h_ave = fftconvolve(h,kernel,mode='same')
         #computing norm
         SD = LA.norm(h_ave)**2/LA.norm(h)**2
         h[:] = h[:] - h_ave[:]
@@ -430,6 +433,33 @@ def compute_imf_fft_adv(f,a,options):
         print('(fft adv): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
 
     return h,inStepN,SD
+
+def fftconvolve1D(f,ker):#, mode = 'same', BCmode = 'wrap'):
+    """
+    
+    Compute the 1D convolution between f and ker, using fft.
+    
+    It assumes that the field is periodic 
+
+    This function is used when the option "extend-periodic" is selected
+
+    
+    parameters
+    ----------
+    f : 1D-like array
+        input array
+    ker : 1D-like array
+        kernel of the convolution filter
+
+    """
+    if f.shape[0] <ker.shape[0]:
+        print('error, kernel shape cannot be larger than 1D array shape')
+        return None
+    
+    m = ker.shape[0]//2
+    kpad = np.pad(ker,((0,f.shape[0]-ker.shape[0])))
+    kpad = np.roll(kpad,-m)
+    return np.fft.irfft(np.fft.rfft(f)*np.fft.rfft(kpad),n=f.shape[0])
 
 ################################################################################
 #################### MIF SPECIFIC AUXILIARY FUNCTIONS ##########################
