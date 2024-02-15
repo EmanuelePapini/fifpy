@@ -40,6 +40,7 @@ def Settings(**kwargs):
     # General 
     options['verbose'] = False    
     options['timeit'] = False    
+    options['silent'] = False    
         
     # FIF
     options['delta'] = 0.001
@@ -154,7 +155,7 @@ def MIF(in_f,options,M=np.array([]), window_mask = None, data_mask = None):#, nt
     ### Begin Iterating ###
     while countIMFs < opts.NIMFs and all([ii >= opts.ExtPoints for ii in k_pp]):
         countIMFs += 1
-        print('IMF', countIMFs)
+        if not opts.silent : print('IMF', countIMFs)
         
         h = np.copy(f)
         if 'M' not in locals() or np.size(M)<countIMFs:
