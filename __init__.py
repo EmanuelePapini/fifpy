@@ -396,7 +396,8 @@ class IF(FIF):
 
         """
         if preprocess == 'make-periodic':
-            print('\nmaking input signal periodic...')
+            if self.options.verbose: print('\nmaking input signal periodic...')
+            
             from .arrays import make_periodic
             
             if wshrink == 0 : wshrink = in_f.size//4 
@@ -404,8 +405,8 @@ class IF(FIF):
             in_f = make_periodic(in_f,wshrink)
         
         elif preprocess == 'extend-periodic':
-            print('\nextending input signal (asymmetric-periodic)...')
-
+            if self.options.verbose: print('\nextending input signal (asymmetric-periodic)...')
+            
             from .arrays import extend_signal
             
             if wshrink == 0 : wshrink = in_f.shape[-1]//2 
