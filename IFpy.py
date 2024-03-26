@@ -1,15 +1,13 @@
 """
  Iterative Filtering python package
 
- Dependencies : numpy, scipy, numba
+ Dependencies : numpy, scipy
 
  Authors: 
     Python version: Emanuele Papini - INAF (emanuele.papini@inaf.it) 
     Original matlab version: Antonio Cicone - university of L'Aquila (antonio.cicone@univaq.it)
 
 """
-import time
-import timeit
 from .IF_aux import *
 __version__='8.4'
 
@@ -22,19 +20,54 @@ __version__='8.4'
 def Settings(**kwargs):
     """
     Sets the default options to be passed to IF
+    options are set in the form of a dictionary.
+    options input as key options in kwargs are added to the default dictionary
+    or modify default options.
     WARNING: NO CHECK IS DONE ON THE VALIDITY OF THE INPUT
     
+    parameters (optional)
+    ---------------------
+    stdout = False  
+        if True, print output to stdout
+    verbose = False 
+        toggle verbosity level.
+    timeit = False  
+        Toggle timing of calculations
+        
+    delta = 0.001 
+        StoppingCriterion1: threshold in the difference of 2Norm 
+    ExtPoints=3 
+        StoppingCriterion2: minimum number of extrema
+    NIMFs=200 
+        StoppingCriterion3: maximum number of IMF to be extracted
+    MaxInner=200 
+        StoppingCriterion4: maximum number of iterations
+    
+    Xi=1.6 
+        stretching factor of the mask
+    alpha='ave' 
+        sets how to calculate the masklength from freq. distribution
+    MonotoneMaskLength=True 
+        sets if a monotone mask length is forced
+    NumSteps=1 
+        number of internal steps in IF loop between two FFTs
+    BCmode = 'clip' 
+        BCmode: boundary of the signal (if periodic is 'wrap')
+    Maxmins_method = 'zerocrossing' 
+        see Maxmins in IF_aux
+    imf_method = 'fft' 
+        select the numerical method for computation ('fft' or 'numba')
+    MaxlogM = None 
+        Maximum allowed mask length (If None then this value is 
+        automatically set to the length of the timeseries.)
+
     """
 
     options = {}
     # General 
-    #options['saveEnd'] = 0
-    #options['saveInter'] = 0
     options['stdout'] = False  #if True, print output to stdout
     options['verbose'] = False #toggle verbosity level.
     options['timeit'] = False  #Toggle timing of calculations
-    #options['plots'] = 0.0
-    #options['saveplots'] = 0     
         
     # FIF   #SC == Stopping criterion (convergence)
     options['delta'] = 0.001 #SC1: threshold in the difference of 2Norm 
@@ -120,8 +153,8 @@ def IterativeFiltering(f,options,M=np.array([]), window_mask=None, data_mask = N
     #loading master filter
     ift = opts.timeit
     if ift: 
-        from . import time
-        ttime = time.timeit()
+        from . import time_1
+        ttime = time_1.timeit()
         time_imfs = 0.
         time_max_nu = 0.
         time_mask = 0.

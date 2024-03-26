@@ -4,7 +4,6 @@ Created on Wed May 11 12:01:41 2016
 
 @author: Emanuele Papini
 
-This module contains all basic tools (functions /class) I developed
     
 """
 
@@ -14,6 +13,8 @@ import numpy as np
 
 def make_periodic(sig, npoints, window_function = 'raised cosine'):
     """
+    make input signal sig periodic by multiplying sig[:npoints] by a raised cosine and
+    sig[-npoint:] by a reversed raised cosine.
     """
     
     nn = np.size(sig)

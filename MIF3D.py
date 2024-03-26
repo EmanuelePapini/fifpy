@@ -1,7 +1,7 @@
 """
  Iterative Filtering python package
 
- Dependencies : numpy, scipy, numba, joblib  //TO CHECK
+ Dependencies : numpy, scipy, numba
 
  This is a full rewriting of MIF, not a wrapper of the original matlab code by Cicone
  
@@ -13,16 +13,10 @@
 
 
 
-import os
 import numpy as np
 from numpy import linalg as LA
-from scipy.io import loadmat
-from scipy.signal import argrelextrema 
-from numpy import fft
-import time
 #import pandas as pd
-import timeit
-from numba import jit,njit,prange,get_num_threads,set_num_threads
+from numba import njit,prange,get_num_threads,set_num_threads
 from attrdict import AttrDict as AttrDictSens
 
 from .IF_aux import FKmask 
@@ -447,17 +441,18 @@ def MIF3D_v3(f,options,M=np.array([]), window_mask=None, data_mask = None, nthre
             print('Using nthreads: ',get_num_threads())
     tol = 1e-12 
 
-    if opts.imf_method == 'fft': 
-        compute_imf3D = compute_imf3d_fft
+    #if opts.imf_method == 'fft': 
+    opts.imf_method = 'fft' 
+    compute_imf3D = compute_imf3d_fft
         #compute_imf2D = _compute_imf2d_fft_adv
-    elif opts.imf_method == 'numba': 
-        compute_imf3D = compute_imf2d_numba
+    #elif opts.imf_method == 'numba': 
+    #    compute_imf3D = compute_imf2d_numba
 
     #loading master filter
     ift = opts.timeit
     if ift: 
-        from . import time
-        ttime = time.timeit()
+        from . import time_1
+        ttime = time_1.timeit()
         time_imfs = 0.
         time_max_nu = 0.
         time_mask = 0.

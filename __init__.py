@@ -646,3 +646,29 @@ class MIF():
         
         if as_output: return self.data['freqs'], self.data['amps']
 
+    def orthogonalize(self,threshold = 0.6, only_nearest = True, **kwargs):
+        """
+        check orthogonality between IMCs and orthogonalize the set by aggregating non-orthogonal IMCs,
+        i.e. IMCs for which
+
+            <IMCs[i]*IMCs[j]> / (<IMCs[i]**2> * <IMCs[j]**2>) >= threshold
+
+        where <...> is the inner product (i.e. the integral).
+
+        The procedure is performed on the single channels of the Mv signal, if one of them is found no to 
+        be orthogonal, e,g, IMCs[i,k] and IMCs[j,k], then all ith and jth IMCs (all k ) are aggregated.
+        
+        Parameters
+        ----------
+        threshold : float 
+            threshold parameter, must range from 0 to 1.
+        only_nearest : bool
+            if True, then only nearest IMF are aggregated (if not orthogonal according to threshold).
+        """
+        
+        if self.data['IMC'].shape[0] <3: #if shape==2 then only one imf was extracted
+            return
+        IMCs = self.data['IMC']
+        imfs = ftools.orthogonalize(IMCs,threshold, only_nearest, **kwargs)
+        self.ancillary['orthogonalized'] = True
+        self.data['IMC'] = imfs

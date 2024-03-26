@@ -1,7 +1,7 @@
 """
  Iterative Filtering python package
 
- Dependencies : numpy, scipy, numba, joblib  //TO CHECK
+ Dependencies : numpy, scipy, numba
 
  This is a full rewriting of MIF, not a wrapper of the original matlab code by Cicone
  
@@ -13,14 +13,11 @@
 
 
 
-import os
 import numpy as np
-import time
-import timeit
 from attrdict import AttrDict as AttrDictSens
 
-from .IF_aux import Maxmins, FKmask, find_max_frequency2D, \
-    get_mask_length2D, get_mask_2D_v3, compute_imf2d_fft, _compute_imf2d_fft_adv
+from .IF_aux import FKmask, find_max_frequency2D, \
+    get_mask_length2D, get_mask_2D_v3, compute_imf2d_fft
 
 __version__='8.4'
 
@@ -33,7 +30,31 @@ def Settings(**kwargs):
     """
     Sets the default options to be passed to MIF
     WARNING: NO CHECK IS DONE ON THE VALIDITY OF THE INPUT
-    
+    options are set in the form of a dictionary.
+    options input as key options in kwargs are added to the default dictionary
+    or modify default options. 
+
+    # General 
+    options['verbose'] = False    
+    options['timeit'] = False    
+    options['silent'] = False    
+        
+    # MIF
+    options['delta'] = 0.001
+    options['ExtPoints']=3
+    options['NIMFs']=20
+    options['Xi']=1.6
+    options['alpha']='ave'
+    options['MaxInner']=200
+    options['MonotoneMaskLength']=True
+    options['IsotropicMask']=True
+    options['NumSteps']= 4
+    options['BCmode'] = 'wrap' # or 'clip' 
+    options['Maxmins_method'] = 'zerocrossing'
+    options['Maxmins_samples'] = 4
+    options['imf_method'] = 'fft' 
+    options['Extend'] = True #If true, extends the signal from nx,ny to 3nx,3ny in case a mask
+                             #bigger than nx (ny) is found
     """
 
     options = {}
@@ -42,7 +63,7 @@ def Settings(**kwargs):
     options['timeit'] = False    
     options['silent'] = False    
         
-    # FIF
+    # MIF
     options['delta'] = 0.001
     options['ExtPoints']=3
     options['NIMFs']=20
@@ -74,7 +95,7 @@ def MIF_run(x, options=None, M = np.array([]),**kwargs):
 
 def FIF_run(*args,**kwargs): return MIF_run(*args,**kwargs)
 
-def MIF(in_f,options,M=np.array([]), window_mask = None, data_mask = None):#, nthreads = None):
+def MIF(in_f,options,M=np.array([]), window_mask = None, data_mask = None):
 
     """
     Multidimensional Iterative Filtering python implementation 
@@ -82,39 +103,30 @@ def MIF(in_f,options,M=np.array([]), window_mask = None, data_mask = None):#, nt
     
     INPUT: f: array-like, shape(M,N)
         
-        THE REST OF THE CRAZY INPUT IS AS USUAL :P
+        THE REST OF THE CRAZY INPUT IS AS USUAL 
 
 
     """
     f = np.copy(in_f)
     opts = AttrDictSens(options)
-    #if nthreads is not None:
-    #    if opts.imf_method == 'numba': 
-    #        set_num_threads(nthreads)
     if opts.verbose:
         print('running IF decomposition...')
-        #if verbose:
         print('****IF settings****')
         [print(i+':',options[i]) for i in options]
         print('data_mask   : ', data_mask is not None )
-        #if opts.imf_method == 'numba':
-        #    print('Using nthreads: ',get_num_threads())
     tol = 1e-12 
 
     if opts.imf_method == 'fft': 
         compute_imf2D = compute_imf2d_fft
-        #compute_imf2D = _compute_imf2d_fft_adv
     else:
         print('Only fft method implemented. Overriding...')
         compute_imf2D = compute_imf2d_fft
-    #elif opts.imf_method == 'numba': 
-    #    compute_imf2D = compute_imf2d_numba
 
     #loading master filter
     ift = opts.timeit
     if ift: 
-        from . import time
-        ttime = time.timeit()
+        from . import time_1
+        ttime = time_1.timeit()
         time_imfs = 0.
         time_max_nu = 0.
         time_mask = 0.
