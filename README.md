@@ -1,6 +1,6 @@
-# FAST ITERATIVE FILTERING python package
+# FAST ITERATIVE FILTERING python module
 
-This repository contains the python for the Iterative Filtering (IF), Fast Iterative Filtering (FIF), Multidimensional Iterative Filtering (MIF), the Multivariate Iterative Filtering (MvFIF) and the Multivariate Fast Iterative Filtering (MvFIF) algorithms.
+This repository contains the python routines for the Iterative Filtering (IF), Fast Iterative Filtering (FIF), Multidimensional Iterative Filtering (MIF), the Multivariate Iterative Filtering (MvFIF) and the Multivariate Fast Iterative Filtering (MvFIF) algorithms.
 
 ## Definitions ##
 * IF: Iterative Filtering is an adaptive method for decomposing a 1D signal into a set of Intrinsic Mode Components (IMC) plus a trend. These components are simple oscillating functions whose average frequency is well behaved and form a complete and nearly orthogonal basis of the original signal. In this repository, IF is made fast by using FFT convolution (similar to FIF but without the problem of having a periodic signal).
@@ -14,7 +14,7 @@ Other versions (e.g. MIF multidimensional 3D) if present, are currently experime
 
 * MvIF: Same as MvFIF, but without the problem of having a periodic signal.
 
-In the package, IMFogram_v1.py contains the methods to calculate the IMFogram (see https://ui.adsabs.harvard.edu/abs/2020arXiv201114209B/abstract)
+In this module, IMFogram_v1.py contains the methods to calculate the IMFogram (see https://ui.adsabs.harvard.edu/abs/2020arXiv201114209B/abstract)
 
 ### Notes ###
 This repository is a complete rewriting of the original matlab code by A. Cicone.
@@ -23,12 +23,12 @@ This repository is a complete rewriting of the original matlab code by A. Cicone
 ### Dependencies ###
 The package has been written and tested in python3.
 
-Dependencies: scipy, numpy, numba, time, pyfftw (optional),  (plus other standard libraries that should be already installed)
+Dependencies: scipy, numpy, numba, sklearn, datetime, attrdict, (pyfftw - optional),  plus other standard libraries that should be already installed.
 
 ### Install ###
 
 Simply download the repository in the desired folder to start using it.
-If you have a PYTHONPATH already set, you can put the fifpy folder directly there so that you can import the package from everywhere.
+If you have a PYTHONPATH already set, you can put the fifpy folder directly in one of the PYTHONPATH folders so that you can import the module from everywhere.
 
 example: assuming fifpy is located in the PYTHONPATH or in the local path from where python3 is been executed 
 
