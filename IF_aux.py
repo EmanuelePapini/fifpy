@@ -9,13 +9,10 @@
 
 """
 
-import os
 import numpy as np
 from numpy import linalg as LA
-from scipy.io import loadmat
 from scipy.signal import argrelextrema 
-from numpy import fft
-from numba import jit,njit,prange,get_num_threads,set_num_threads
+from numba import njit,prange,get_num_threads,set_num_threads
 
 
 from .prefixed_double_filter import MM as FKmask
@@ -503,8 +500,7 @@ def find_max_frequency2D(f,nsamples = 1, **kwargs):
     
     """
     from random import randrange
-    #maxmins_x = []
-    #maxmins_y = []
+    
     N,M = f.shape
     kn = N//nsamples
     km = M//nsamples
@@ -517,13 +513,11 @@ def find_max_frequency2D(f,nsamples = 1, **kwargs):
         for ix in range(kn):
             maxmins_x = Maxmins(f[randrange(N),:].flatten(),**kwargs)
             if maxmins_x is not None: break
-        #maxmins_x.append(mxms)
-        #del mxms
+        
         for iy in range(km):
             maxmins_y = Maxmins(f[:,randrange(M)].flatten(),**kwargs)
             if maxmins_y is not None: break
-        #maxmins_y.append(mxms)
-        #del mxms
+        
         if maxmins_x is not None and maxmins_y is not None:
             diff_x = [] if np.size(maxmins_x) < 2 else np.diff(maxmins_x)
             diff_y = [] if np.size(maxmins_y) < 2 else np.diff(maxmins_y)
@@ -539,9 +533,7 @@ def find_max_frequency2D(f,nsamples = 1, **kwargs):
     k_pp = np.array(k_pp).squeeze().max(axis=0)
 
     #flattening distribution of maxmins distances to be used for percentile
-    #calculation (see get_mask_length
-    #diffMaxmins_x = np.array(diffMaxmins_x).flatten()
-    #diffMaxmins_y = np.array(diffMaxmins_y).flatten()
+    #calculation (see get_mask_length)
     diffMaxmins_x = np.concatenate([i.flatten() for i in diffMaxmins_x if np.size(i) > 0])
     diffMaxmins_y = np.concatenate([i.flatten() for i in diffMaxmins_y if np.size(i) > 0])
     N_pp = (N,M)
@@ -550,7 +542,6 @@ def find_max_frequency2D(f,nsamples = 1, **kwargs):
 
 
 def get_mask_length2D(options,N_pp,k_pp,diffMaxmins_x,diffMaxmins_y,logM,countIMFs):
-    #m = get_mask_length2D(opts,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs)
     
     if isinstance(options.alpha,str):
     
@@ -613,7 +604,7 @@ def get_mask_2D_v3(w,k):
         k=tuple([int(i) for i in k])
 
     L=np.size(w)
-    m=(L-1)/2;  #2*m+1 =L punti nel filtro
+    m=(L-1)/2;  
     w = np.pad(w,(0,(L-1)//2))
     A=np.zeros((2*k[0]+1,2*k[1]+1))
     if all([i<=m for i in k]): # The prefixed filter contains enough points

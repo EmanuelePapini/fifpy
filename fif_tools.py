@@ -1,16 +1,35 @@
 import numpy as np
-from numba import jit, prange
 
 from scipy.integrate import trapz as integrate
 
 def aggregate_IMCs(imfs,freqs,freq_ranges,return_mean_freq = False):
     """
-    aggregate 2D IMF according to frequency range given in input
-    The frequency range defines the limit.
+    aggregate 2D IMF obtained from the MIF decomposition
+    according to frequency range given in input.
+    The frequency range defines the limits.
     i.e. if frequency range contains two frequencies [f1,f2]
     then it returns 3 aggregate imf. one contaning freqs. bewteen 0 and f1,
     the second between f1 and f2, and the last one containing all freqs.
     >f2.
+
+    Parameters
+    ----------
+    imfs : 3D array
+        array of shape (nimfs,nx,ny) of the imfs extracted from MIF.
+    freqs : array (shape: (nimfs,))
+        frequencies associated to the imfs.
+    freq_ranges : 1D array like
+        frequency ranges for the aggregation of imfs.
+    return_mean_freq : bool
+        If True, then it also return the frequencies given by the average 
+        frequency of the range.
+    
+    output
+    ------
+    agimfs : 3D array of shape (len(freq_ranges)+1,nx,ny)
+        output aggregated imfs
+    mean_freqs: 1D array like of shape (len(freq_ranges)+1,)
+        array of new average frequencies.
     """
     agimfs=np.zeros((len(freq_ranges)+1,imfs.shape[1],imfs.shape[2]))
     mean_freqs = np.zeros(agimfs.shape[0])
@@ -35,7 +54,22 @@ def aggregate_IMCs(imfs,freqs,freq_ranges,return_mean_freq = False):
 
 def check_orthogonality(imfs,periodic=True, plot=False):
     """
-    WORKS ONLY FOR 1D/2D IMCs. MUST BE IMPLEMENTED TO WORK WITH ND IMCs
+    calculate the orthogonality (cross-correlation) matrix M between the input imfs
+
+        M_ij = Corr(imfs[i],imfs[j])
+    
+    where Corr is the Crosscorrelation operator.
+
+    Parameters
+    ----------
+    imfs : 3D array
+        array of shape (nimfs,nx,ny) of the imfs extracted from MIF.
+    periodic : bool
+        set to True if imfs are periodic 
+    plot : bool
+        plot the result
+    WARNING: WORKS ONLY FOR 1D/2D IMCs. MUST BE IMPLEMENTED TO WORK 
+             WITH NDimensional IMCs.
 
     """
 
@@ -85,13 +119,27 @@ def check_orthogonality(imfs,periodic=True, plot=False):
                 plt.xlabel(r'$j$',fontsize=14)
                 plt.ylabel(r'$i$',fontsize=14)
                 plt.title(r'$\langle \mathrm{IMF}_i,\mathrm{IMF}_j\rangle $')
-
+        plt.show()
     return orto
 
 def orthogonalize(imfs,threshold = 0.6, **kwargs):
     """
-    TESTED ONLY FOR 2D IMCS. IT SHOULD WORK WITH ND IMCS, PROVIDED THAT check_orthogonality HAS BEEN 
-    IMPLEMENTED TO WORK WITH ND IMCS
+    
+    Sum imfs whose correlation is above the Threshold (see check_orthogonality).
+
+    Parameters
+    ----------
+    imfs : 1D+ND array
+        array of shape (nimfs,...) of the imfs extracted from MIF.
+    
+    threshold: float
+        orthogonality thershold: imfs for which Corr(imfs[i],imfs[j]) > threshold
+        are aggregated/summed.
+    **kwargs:
+        auxiliary input to be passed to check_orthogonality()
+    WARNING: TESTED ONLY FOR 2D IMCS. IT SHOULD WORK WITH ND IMCS, PROVIDED 
+             THAT check_orthogonality HAS BEEN IMPLEMENTED TO WORK WITH ND 
+             IMCS.
 
     """
 
@@ -113,7 +161,27 @@ def orthogonalize(imfs,threshold = 0.6, **kwargs):
 ##### SPECIFIC MvFIF tools #####
 def check_orthogonality_MvFIF(imfs,periodic=True, plot=False,only_nearest = False):
     """
+    calculate the orthogonality (cross-correlation) matrix M between the input imfs 
+    as given in output by MvIF / MvFIF.
+
+        M_ij = Corr(imfs[i],imfs[j])
+    
+    where Corr is the Crosscorrelation operator.
+
     WORKS ONLY FOR 1D multichannel IMCs as given in output by MvFIF and MvIF
+
+    Parameters
+    ----------
+    imfs : 3D array
+        array of shape (nchannels,nimfs,nx) of the imfs extracted from Mv(F)IF.
+    periodic : bool
+        set to True if imfs are periodic 
+    plot : bool
+        plot the result
+    only_nearest : bool
+        if True only near imfs are checked for orthogonality.
+    WARNING: WORKS ONLY FOR 1D/2D IMCs. MUST BE IMPLEMENTED TO WORK 
+             WITH NDimensional IMCs.
 
     """
     from scipy.integrate import trapz as integrate
@@ -182,8 +250,21 @@ def check_orthogonality_MvFIF(imfs,periodic=True, plot=False,only_nearest = Fals
 
 def orthogonalize_MvFIF(imfs,threshold = 0.6, only_nearest = True, **kwargs):
     """
-    TESTED ONLY FOR 1D multichannel IMCS. 
+    Sum imfs whose correlation is above the Threshold (see check_orthogonality_MvFIF).
 
+    TESTED ONLY FOR 1D multichannel IMCS. 
+    
+    Parameters
+    ----------
+    imfs : 3D array of shape (nimfs,nchannels,nx)
+        array of imcs as obtained from Mv(F)IF.
+    threshold: float
+        orthogonality thershold: imfs for which Corr(imfs[i],imfs[j]) > threshold
+        are aggregated/summed.
+    
+    Output
+    ------
+    imfst: 3D array of aggregated imfs
     """
 
     orto =check_orthogonality_MvFIF(imfs,only_nearest = only_nearest, **kwargs)
@@ -212,6 +293,12 @@ def IMC_get_freq_amp(IMF, dt = 1, resort = False, wshrink = 0, use_instantaneous
     Compute amplitude and average frequency of a set of IMCs.
     Parameters
     ----------
+    IMF: 2D-array
+        array containing IMCs as calculated from (F)IF.
+    dt : float
+        time/space resolution of the imfs
+    resort: bool
+        if true, imfs are resorted according to decreasing frequency
     use_instantaneous_freq : bool
         if True, then it uses the instantaneous frequency to calculate the average frequency of the IMC,
         if False, the average freq is found by counting maxima and minima in the IMC
@@ -314,6 +401,12 @@ def IMC_get_freq_amp_MIF(IMF, dt = 1, resort = False, wshrink = 0, use_instantan
     Compute amplitude and average frequency of a set of IMCs.
     Parameters
     ----------
+    IMF: 3D-array
+        array containing IMCs as calculated from MIF.
+    dt : float
+        time/space resolution of the imfs
+    resort: bool
+        if true, imfs are resorted according to decreasing frequency
     use_instantaneous_freq : bool
         if True, then it uses the instantaneous frequency to calculate the average frequency of the IMC,
         if False, the average freq is found by counting maxima and minima in the IMC
@@ -322,6 +415,8 @@ def IMC_get_freq_amp_MIF(IMF, dt = 1, resort = False, wshrink = 0, use_instantan
         if >0, then only the central part of the IMC[:,wshrink:-wshrink] is used to calculate the amplitude
         This should be used when periodic extension is used or when windowing is used.
 
+    nsamples : int (positive)
+        number of slices (along x and y) to use for the calculation of the frequency.
     """
 
     from random import randrange

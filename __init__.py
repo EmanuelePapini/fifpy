@@ -12,7 +12,7 @@
 
 from . import fif_tools as ftools
 
-import sys
+#import sys
 import numpy as np
 from copy import copy
 
@@ -26,7 +26,7 @@ __version__ = ('FIF:'+FIFpy.__version__,'MvFIF:'+MvFIFpy.__version__,\
                'IF:'+IFpy.__version__,'MvIF:'+MvIFpy.__version__,\
                'MIF:'+MIFpy.__version__)
 
-_path_=sys.modules[__name__].__file__[0:-11]
+#_path_=sys.modules[__name__].__file__[0:-11]
 #window_file = _path_+'prefixed_double_filter.mat'
 
 
@@ -36,7 +36,7 @@ _path_=sys.modules[__name__].__file__[0:-11]
 class FIF():
     """
 
-    Python class of the (Fast) Iterative Filtering (FIF) method  
+    Python class of the Fast Iterative Filtering (FIF) method  
     
     Calling sequence example
 
@@ -159,33 +159,22 @@ class FIF():
         """
         return self.data['IMC'][:,self.wsh:-self.wsh] if self.wsh >0 else self.data['IMC'] 
 
-    #def get_inst_freq_amp(self,dt, as_output = False ):
-    #    """
-    #    get instantaneous frequencies and amplitudes of the IMCs
-    #    if as_output is true, it returns the result instead of adding it to data
-    #    THIS METHOD IS DEPRECATED SINCE IT DOESN'T USE wshrink.
-    #    PLEASE USE get_freq_amplitudes instead
-    #    """
-    #    
-    #    if as_output:
-    #        return ftools.IMC_get_inst_freq_amp(self.data['IMC'],dt)
-    #    
-    #    self.data['IMC_inst_freq'], self.data['IMC_inst_amp'] = ftools.IMC_get_inst_freq_amp(self.data['IMC'],dt)
-
-
     def get_freq_amplitudes(self, as_output = False, use_instantaneous_freq = True,  **kwargs):
         """
         see fif_tools.IMC_get_freq_amplitudes for a list of **kwargs
 
+        Parameters
+        ----------
         as_output : bool
-            self-explaining
-        use_instantaneous_freq = True : bool
+            if set to True, then it returns inst. frequency and amplitude.
+            If set to false, save the result in self.data['freqs'] and self.data['amps'].
+        use_instantaneous_freq : bool
             use the instantaneous freq. to compute the average freq of the IMC
         
         the available **kwargs should be
-            dt = 1. : float 
-                grid resolution (inverse of the sampling frequency) 
-            resort = False : Bool
+            dt : float (default = 1.) 
+                time resolution (inverse of the sampling frequency) 
+            resort : Bool (default = False)
                 if true, frequencies and amplitudes are sorted frequency-wise
                 
         """
@@ -204,10 +193,16 @@ class FIF():
         check orthogonality between IMCs and orthogonalize the set by aggregating non-orthogonal IMCs,
         i.e. IMCs for which
 
-            <IMCs[i]*IMCs[j]> / (<IMCs[i]**2> * <IMCs[j]**2>) >= 0.6
+            <IMCs[i]*IMCs[j]> / (<IMCs[i]**2> * <IMCs[j]**2>) >= threshold
 
         where <...> is the inner product (i.e. the integral).
 
+        Parameters
+        ----------
+        threshold : float 
+            threshold parameter, must range from 0 to 1.
+        only_nearest : bool
+            if True, then only nearest IMF are aggregated (if not orthogonal according to threshold).
         """
         if self.data['IMC'].shape[0] <3: #if shape==2 then only one imf was extracted
             return
@@ -282,24 +277,30 @@ class MvFIF(FIF):
     @property
     def IMC(self):
         """
-        return the input timeseries (including extension)
+        Return the extracted IMCs (excluding the extension)
         """
         return self.data['IMC'][:,:,self.wsh:-self.wsh] if self.wsh >0 else self.data['IMC'] 
 
     def get_freq_amplitudes(self, as_output = False, use_instantaneous_freq = True,  **kwargs):
         """
-        see fif_tools.IMC_get_freq_amplitudes for a list of **kwargs
-
+        
+        Calculates the instantaneous frequencies and amplitudes of the IMCs.
+        
+        see fif_tools.IMC_get_freq_amplitudes for a list of **kwargs.
+        
+        Parameters
+        ----------
         as_output : bool
-            self-explaining
+            if set to True, then it returns inst. frequency and amplitude.
+            If set to false, save the result in self.data['freqs'] and self.data['amps'].
+        use_instantaneous_freq : bool
+            use the instantaneous freq. to compute the average freq of the IMC
         
         the available **kwargs should be
-            dt = 1. : float 
-                grid resolution (inverse of the sampling frequency) 
-            resort = False : Bool
+            dt : float (default = 1.) 
+                time resolution (inverse of the sampling frequency) 
+            resort : Bool (default = False)
                 if true, frequencies and amplitudes are sorted frequency-wise
-            use_instantaneous_freq = True : bool
-                use the instantaneous freq. to compute the average freq of the IMC
                 
         """
         wsh = self.ancillary['wshrink']
@@ -325,12 +326,19 @@ class MvFIF(FIF):
         check orthogonality between IMCs and orthogonalize the set by aggregating non-orthogonal IMCs,
         i.e. IMCs for which
 
-            <IMCs[i]*IMCs[j]> / (<IMCs[i]**2> * <IMCs[j]**2>) >= 0.6
+            <IMCs[i]*IMCs[j]> / (<IMCs[i]**2> * <IMCs[j]**2>) >= threshold
 
         where <...> is the inner product (i.e. the integral).
-        
-        The procedure is done on the single channels of the Mv signal, if one of them is found no to 
+
+        The procedure is performed on the single channels of the Mv signal, if one of them is found no to 
         be orthogonal, e,g, IMCs[i,k] and IMCs[j,k], then all ith and jth IMCs (all k ) are aggregated.
+        
+        Parameters
+        ----------
+        threshold : float 
+            threshold parameter, must range from 0 to 1.
+        only_nearest : bool
+            if True, then only nearest IMF are aggregated (if not orthogonal according to threshold).
         """
         
         if self.data['IMC'].shape[0] <3: #if shape==2 then only one imf was extracted
@@ -342,15 +350,18 @@ class MvFIF(FIF):
 
 class IF(FIF):
     """
-    Advanced class for IF decompostion.
+    Advanced class for Iterative Filtering decompostion. (Fast version using FFT to make convolutions),
+    
     It contains all the core features of the IF class plus some methods
     to perform statistics over the computed IMCs.
+    
+    N.B. This is not FIF, but it is as fast as FIF.
     """
 
     def __init__(self, **kwargs):
         """
         initialize Iterative Filtering Class.
-        For kwargs options please look at the Settings method in fifpy.IFpy
+        For kwargs options please look at fifpy.IFpy.Settings()
         """
 
 
@@ -377,7 +388,13 @@ class IF(FIF):
         
         preprocess : str
             allowed values : 'make-periodic', 'extend-periodic', None
-        
+            'make-periodic': make in_f periodic prior running IF decomposition by means of a raised 
+                             cosine windowing of length wshrink. The non-windowed part of in_f is
+                             in_f[wshrink:-wshrink]
+            'extend-periodic': extend in_f to make it periodic prior running IF decomposition by means of a raised 
+                             cosine windowing of length wshrink, applied on an extend version of in_f obtained 
+                             using the fifpy.arrays.extend_periodic method.
+            None: self explaining
         M : list of int (optional)
             list of mask lengths to be used (optional). 
             NOTE: this will force the decomposition to use predefined mask lengths.
@@ -391,8 +408,9 @@ class IF(FIF):
             if input, then the points where data_mask == True are excluded from the calculation
             of the mask length. This is used, e.g. to deal with gaps that may be present in the data
             which should be filled before starting the decomposition.
-        **kwargs: dict
-            optional kwargs to be passed to FIFpy.FIF_run
+        npad_raisedcos : int or sequence of ints or None
+            number of points (from left and right boundary) where to apply the raised cosine.
+            If None, then npad_raisedcos = wshrink if 'make-periodic' or 'extend-periodic' are selected.
 
         """
         if preprocess == 'make-periodic':
@@ -432,7 +450,7 @@ class MvIF(MvFIF):
 
     def __init__(self, **kwargs):
         """
-        initialize Iterative Filtering Class.
+        initialize MultiVariate Iterative Filtering Class.
         For kwargs options please look at the Settings method in fifpy.MvIFpy
         """
 
@@ -472,8 +490,8 @@ class MvIF(MvFIF):
             which should be filled before starting the decomposition.
         
         npad_raisedcos : int or sequence of ints or None
-        number of points (from left and right boundary) where to apply the raised cosine.
-        If None, then npad = npad_raisedcos if 'make-periodic' or 'extend-periodic' are selected.
+            number of points (from left and right boundary) where to apply the raised cosine.
+            If None, then npad_raisedcos = wshrink if 'make-periodic' or 'extend-periodic' are selected.
 
         """
         silent = self.options['silent']
@@ -549,7 +567,7 @@ class MIF():
 
     def __init__(self, **kwargs):
         """
-        initialize Iterative Filtering Class.
+        initialize Multidimensional Iterative Filtering Class.
         For kwargs options please look at the Settings method in fifpy.MIFpy
         """
 
@@ -596,28 +614,24 @@ class MIF():
 
     def get_freq_amplitudes(self, as_output = False, use_instantaneous_freq = True,nsamples = None,  **kwargs):
         """
-        see fif_tools.IMC_get_freq_amp_MIF for a list of **kwargs
-
-        the available **kwargs should be
-            dt = 1. : float 
-                grid resolution (inverse of the sampling frequency)
-                WARNING! It is assumed that 2D grids have same resolution in x and y
-
-            resort = False : Bool
-                if true, frequencies and amplitudes are sorted frequency-wise
-            use_instantaneous_freq = True : bool
-                use the instantaneous freq. to compute the average freq of the IMC
-                
+        Calculates the instantaneous frequencies and amplitudes of the IMCs.
+        
+        see fif_tools.IMC_get_freq_amplitudes for a list of **kwargs.
+        
+        Parameters
+        ----------
         as_output : bool
             self-explaining
         use_instantaneous_freq = True : bool
             use the instantaneous freq. to compute the average freq of the IMC
         
         the available **kwargs should be
-            dt = 1. : float 
-                grid resolution (inverse of the sampling frequency) 
-            resort = False : Bool
+            dt : float (default = 1.) 
+                grid resolution (inverse of the sampling frequency)
+                WARNING! It is assumed that 2D grids have same resolution in x and y
+            resort : Bool (default = False)
                 if true, frequencies and amplitudes are sorted frequency-wise
+        see fif_tools.IMC_get_freq_amp_MIF for a list of **kwargs
                 
         """
         
@@ -632,3 +646,29 @@ class MIF():
         
         if as_output: return self.data['freqs'], self.data['amps']
 
+    def orthogonalize(self,threshold = 0.6, only_nearest = True, **kwargs):
+        """
+        check orthogonality between IMCs and orthogonalize the set by aggregating non-orthogonal IMCs,
+        i.e. IMCs for which
+
+            <IMCs[i]*IMCs[j]> / (<IMCs[i]**2> * <IMCs[j]**2>) >= threshold
+
+        where <...> is the inner product (i.e. the integral).
+
+        The procedure is performed on the single channels of the Mv signal, if one of them is found no to 
+        be orthogonal, e,g, IMCs[i,k] and IMCs[j,k], then all ith and jth IMCs (all k ) are aggregated.
+        
+        Parameters
+        ----------
+        threshold : float 
+            threshold parameter, must range from 0 to 1.
+        only_nearest : bool
+            if True, then only nearest IMF are aggregated (if not orthogonal according to threshold).
+        """
+        
+        if self.data['IMC'].shape[0] <3: #if shape==2 then only one imf was extracted
+            return
+        IMCs = self.data['IMC']
+        imfs = ftools.orthogonalize(IMCs,threshold, only_nearest, **kwargs)
+        self.ancillary['orthogonalized'] = True
+        self.data['IMC'] = imfs

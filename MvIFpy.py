@@ -1,8 +1,7 @@
 """
  Multivariate Iterative Filtering python package
 
- Dependencies : numpy, scipy, numba, joblib  //TO CHECK
-
+ Dependencies : numpy, scipy 
  Authors: 
     Python version: Emanuele Papini - INAF (emanuele.papini@inaf.it) 
     Original matlab version: Antonio Cicone - university of L'Aquila (antonio.cicone@univaq.it)
@@ -12,8 +11,6 @@
 
 
 
-import time
-import timeit
 from .IF_aux import *
 __version__='8.4'
 
@@ -161,8 +158,8 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
     #loading master filter
     ift = opts.timeit
     if ift: 
-        from . import time
-        ttime = time.timeit()
+        from . import time_1
+        ttime = time_1.timeit()
         time_imfs = 0.
         time_max_nu = 0.
         time_mask = 0.

@@ -1,19 +1,16 @@
 """
  Multivariate Fast Iterative Filtering python package
 
- Dependencies : numpy, scipy, numba,sklearn
+ Dependencies : numpy, scipy, numba,sklearn, pyfftw
 
  Authors: 
     Python version: Emanuele Papini - INAF (emanuele.papini@inaf.it) 
     Original matlab version: Antonio Cicone - university of L'Aquila (antonio.cicone@univaq.it)
 """
-import os
 import numpy as np
 from numpy import linalg as LA
-from scipy.io import loadmat
-from scipy.signal import argrelextrema 
 from numba import jit,njit
-from .IF_aux import FKmask, lanorm, get_mask_v1_1
+from .IF_aux import FKmask, get_mask_v1_1, AttrDictSens
 __version__='8.4'
 
 
@@ -54,7 +51,7 @@ def FIF_run(x,  options=None, **kwargs):
 
 
 
-def MvFIF(x, options,M=np.array([]),data_mask = None):#delta, alpha, NumSteps, ExtPoints, NIMFs, MaxInner, Xi=1.6, M=np.array([]), MonotoneMaskLength=True, verbose=False,window_mask=None,fft='pyfftw',threads=None, MaskLengthType = 'angle',data_mask = None):
+def MvFIF(x, options,M=np.array([]),data_mask = None, window_mask=None):
    
     """
     MultiVariate Fast Iterative Filtering python implementation (version 8)
