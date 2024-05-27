@@ -3,8 +3,6 @@ import numpy as np
 from numpy import linalg as LA
 from scipy.signal import argrelextrema 
 from numpy import fft
-import time
-import timeit
 from numba import jit
 from .IF_aux import FKmask
 
