@@ -63,9 +63,10 @@ class FIF():
     WARNING: This class is not fully documented nor error proof.
     Should you need help, please contact Emanuele Papini (emanuele.papini@inaf.it) 
 
-    Eventual settings (e.g. Xi, delta and so on) must be specified at the time of initialization
+    Optional settings (e.g. Xi, delta and so on) must be specified at the time of initialization
     
-    Init Parameters 
+    Parameters
+    ---------- 
     delta : float (default 0.001)
         Stopping criterion based on the 2norm difference threshold between the nth 
         and the nth-1 high-pass-filtered signal in the iteration.
@@ -89,8 +90,8 @@ class FIF():
     MaxInner : int (default 200)
         Stopping criterion. The maximum number of iterations allowed in the extraction of one IMC
     MonotoneMaskLength : bool (default True)
-        If True, the mask length of the next IMCs is forced to be 1.1*mask length of the current one if
-        the mask length calculation return a smaller length.
+        If True, the mask length of the next IMC is forced to be 1.1*mask length of the current one if
+        the mask length calculation of the next IMC returns a smaller length.
     NumSteps : int (default 1)
         number of steps to do in the iteration between the check of the 2norm difference (see delta)
     verbose : bool (default False)
@@ -133,7 +134,7 @@ class FIF():
             of the original signal).
 
         **kwargs: dict
-            optional kwargs to be passed to FIFpy.FIF_run
+            optional kwargs to be passed to self.FIFpy.FIF_run
 
         """
         self.data = {}
@@ -161,7 +162,7 @@ class FIF():
 
     def get_freq_amplitudes(self, as_output = False, use_instantaneous_freq = True,  **kwargs):
         """
-        see fif_tools.IMC_get_freq_amplitudes for a list of **kwargs
+        Calculates average (integrated) instant frequencies and amplitudes of all IMCs
 
         Parameters
         ----------
@@ -171,17 +172,16 @@ class FIF():
         use_instantaneous_freq : bool
             use the instantaneous freq. to compute the average freq of the IMC
         
-        the available **kwargs should be
+        the available **kwargs are the following kwargs from fifpy.fif_tools.IMC_get_freq_amplitudes
             dt : float (default = 1.) 
                 time resolution (inverse of the sampling frequency) 
-            resort : Bool (default = False)
-                if true, frequencies and amplitudes are sorted frequency-wise
-                
+            resort: bool
+                if true, imfs are resorted according to decreasing frequency
         """
         wsh = self.ancillary['wshrink']
 
         self.data['freqs'], self.data['amps'] = ftools.IMC_get_freq_amp(self.data['IMC'], \
-                                                    use_instantaneous_freq = use_instantaneous_freq, wshrink = wsh,  **kwargs)
+            use_instantaneous_freq = use_instantaneous_freq, wshrink = wsh,  **kwargs)
 
         self.ancillary['get_freq_amplitudes'] = kwargs
         self.ancillary['get_freq_amplitudes']['use_instantaneous_freq'] = use_instantaneous_freq
@@ -193,7 +193,7 @@ class FIF():
         check orthogonality between IMCs and orthogonalize the set by aggregating non-orthogonal IMCs,
         i.e. IMCs for which
 
-            <IMCs[i]*IMCs[j]> / (<IMCs[i]**2> * <IMCs[j]**2>) >= threshold
+            <IMCs[i]*IMCs[j]> / sqrt(<IMCs[i]**2> * <IMCs[j]**2>) >= threshold
 
         where <...> is the inner product (i.e. the integral).
 
@@ -202,7 +202,7 @@ class FIF():
         threshold : float 
             threshold parameter, must range from 0 to 1.
         only_nearest : bool
-            if True, then only nearest IMF are aggregated (if not orthogonal according to threshold).
+            if True, then only nearest IMF (if not orthogonal according to threshold) are aggregated.
         """
         if self.data['IMC'].shape[0] <3: #if shape==2 then only one imf was extracted
             return
@@ -226,7 +226,8 @@ class MvFIF(FIF):
     WARNING: This class is not fully documented nor error proof.
     Should you need help, please contact Emanuele Papini (emanuele.papini@inaf.it) 
     
-    Init Parameters 
+    Parameters
+    ----------
     delta : float (default 0.001)
         Stopping criterion based on the 2norm difference threshold between the nth 
         and the nth-1 high-pass-filtered signal in the iteration.
@@ -250,8 +251,8 @@ class MvFIF(FIF):
     MaxInner : int (default 200)
         Stopping criterion. The maximum number of iterations allowed in the extraction of one IMC
     MonotoneMaskLength : bool (default True)
-        If True, the mask length of the next IMCs is forced to be 1.1*mask length of the current one if
-        the mask length calculation return a smaller length.
+        If True, the mask length of the next IMC is forced to be 1.1*mask length of the current one if
+        the mask length calculation of the next IMC returns a smaller length.
     NumSteps : int (default 1)
         number of steps to do in the iteration between the check of the 2norm difference (see delta)
     verbose : bool (default False)
@@ -286,8 +287,6 @@ class MvFIF(FIF):
         
         Calculates the instantaneous frequencies and amplitudes of the IMCs.
         
-        see fif_tools.IMC_get_freq_amplitudes for a list of **kwargs.
-        
         Parameters
         ----------
         as_output : bool
@@ -296,7 +295,7 @@ class MvFIF(FIF):
         use_instantaneous_freq : bool
             use the instantaneous freq. to compute the average freq of the IMC
         
-        the available **kwargs should be
+        the available **kwargs are the following kwargs from self.fif_tools.IMC_get_freq_amplitudes
             dt : float (default = 1.) 
                 time resolution (inverse of the sampling frequency) 
             resort : Bool (default = False)
@@ -326,7 +325,7 @@ class MvFIF(FIF):
         check orthogonality between IMCs and orthogonalize the set by aggregating non-orthogonal IMCs,
         i.e. IMCs for which
 
-            <IMCs[i]*IMCs[j]> / (<IMCs[i]**2> * <IMCs[j]**2>) >= threshold
+            <IMCs[i]*IMCs[j]> / sqrt(<IMCs[i]**2> * <IMCs[j]**2>) >= threshold
 
         where <...> is the inner product (i.e. the integral).
 
@@ -338,7 +337,7 @@ class MvFIF(FIF):
         threshold : float 
             threshold parameter, must range from 0 to 1.
         only_nearest : bool
-            if True, then only nearest IMF are aggregated (if not orthogonal according to threshold).
+            if True, then only nearest IMF (if not orthogonal according to threshold) are aggregated.
         """
         
         if self.data['IMC'].shape[0] <3: #if shape==2 then only one imf was extracted
@@ -407,7 +406,7 @@ class IF(FIF):
         data_mask :1D array of bool (size N)
             if input, then the points where data_mask == True are excluded from the calculation
             of the mask length. This is used, e.g. to deal with gaps that may be present in the data
-            which should be filled before starting the decomposition.
+            which must be filled before starting the decomposition.
         npad_raisedcos : int or sequence of ints or None
             number of points (from left and right boundary) where to apply the raised cosine.
             If None, then npad_raisedcos = wshrink if 'make-periodic' or 'extend-periodic' are selected.
@@ -560,8 +559,8 @@ class MIF():
         [plt.plot(x,mif_object.IMF[i,:],label = 'IMF#'+i.str()) for i in range(a.IMF.shape[0])]
         plt.legend(loc='best')
 
-    Eventual custom settings (e.g. Xi, delta and so on) must be specified at the time of initialization
-    (see __init__ below)
+    Custom settings (e.g. Xi, delta and so on) must be specified at the time of initialization
+    (see fifpy.MIFpy.Settings )
 
     """
 
@@ -651,7 +650,7 @@ class MIF():
         check orthogonality between IMCs and orthogonalize the set by aggregating non-orthogonal IMCs,
         i.e. IMCs for which
 
-            <IMCs[i]*IMCs[j]> / (<IMCs[i]**2> * <IMCs[j]**2>) >= threshold
+            <IMCs[i]*IMCs[j]> / sqrt(<IMCs[i]**2> * <IMCs[j]**2>) >= threshold
 
         where <...> is the inner product (i.e. the integral).
 

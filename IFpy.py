@@ -178,7 +178,8 @@ def IterativeFiltering(f,options,M=np.array([]), window_mask=None, data_mask = N
     #Find max-frequency contained in signal
     if ift: ttime.tic 
     f_pp = np.delete(f,data_mask) if data_mask is not None else f
-    N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f_pp,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
+    N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f_pp,tol=tol, \
+        mode = opts.BCmode, method = opts.Maxmins_method)
     if ift: time_max_nu += ttime.get_toc
 
     countIMFs = 0
@@ -236,7 +237,8 @@ def IterativeFiltering(f,options,M=np.array([]), window_mask=None, data_mask = N
         #Find max-frequency contained in residual signal
         if ift: ttime.tic 
         f_pp = np.delete(f,data_mask) if data_mask is not None else f
-        N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f_pp,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
+        N_pp, k_pp, maxmins_pp, diffMaxmins_pp = find_max_frequency(f_pp,tol=tol, \
+            mode = opts.BCmode, method = opts.Maxmins_method)
         if ift: time_max_nu += ttime.get_toc
         
 

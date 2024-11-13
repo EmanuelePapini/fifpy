@@ -29,7 +29,7 @@ def lanorm(x,ordd):
 def Maxmins(x, tol = 1e-12, mode = 'clip', method = 'zerocrossing'):
     """
     Finds the indices of the extrema (maxima and minima) contained in x, or 
-    in it derivative (if 'zerocrossing' is selected.
+    in its derivative (if 'zerocrossing' is selected).
     
     Parameters
     ----------
@@ -170,8 +170,17 @@ def get_mask_v1_1(y, k,verbose,tol):
     Rescale the mask y so that its length becomes 2*k+1.
     k could be either an integer or a float.
     y is the area under the curve for each bar
-    
-    wrapped from FIF_v2_13.m
+
+    Parameters
+    ----------
+    y : 1D-array like
+        input mask function
+    k : int or float
+        mask length
+    verbose : bool
+        set verbose level
+    tol : float
+        tolerance to be used in the normalization check
     
     """
     n = np.size(y)
@@ -257,6 +266,16 @@ def compute_imf_numba(f,a,options):
     
     N.B. This calculation is done via convolution of f with a in normal space,
     using numba to accelerate the computations.
+    
+    Parameters
+    ----------
+    f : 1D float array
+        input signal
+    a : 1D float array
+        window function
+    options : dict
+        dictionary containing the settings of the decomposition 
+        (see, e.g.,  fifpy.IFpy.Settings method).
     """
     h = np.array(f)
     h_ave = np.zeros(len(h))
@@ -311,10 +330,20 @@ def compute_imf_fft(f,a,options):
     N.B. This calculation is done via convolution of f with a in Fourier space,
     using scipy.signal.fftconvolve
     
-    mandatory keyword in options:
-    'delta' : minimum difference in the 2norm between the two iterations
-    'MaxInner': maximum number of iterations
-    'verbose' : verbosity level 
+    Parameters
+    ----------
+    f : 1D float array
+        input signal
+    a : 1D float array
+        window function
+    
+    options : dict
+        dictionary containing the settings of the decomposition 
+        (see, e.g.,  fifpy.IFpy.Settings method).
+        mandatory keyword in options:
+        'delta' : minimum difference in the 2norm between the two iterations
+        'MaxInner': maximum number of iterations
+        'verbose' : verbosity level 
     """
         
     from scipy.signal import fftconvolve
@@ -498,6 +527,14 @@ def find_max_frequency2D(f,nsamples = 1, **kwargs):
     maxmins: array of integer (size k_pp), index (location) of extrema
     diffMaxmins: array of integer (size k_pp -1): distance between neighbohr extrema
     
+    Parameters
+    ----------
+    f : 2D array
+        input 2D signal
+    nsamples : int
+        number of cut along which to calculate the ma frequency
+    kwargs : dict
+        optional kwargs to be passed to Maxmins
     """
     from random import randrange
     
@@ -542,7 +579,22 @@ def find_max_frequency2D(f,nsamples = 1, **kwargs):
 
 
 def get_mask_length2D(options,N_pp,k_pp,diffMaxmins_x,diffMaxmins_y,logM,countIMFs):
+    """
+    calculate mask length from a 2D signal 
+
+    Parameters:
+    options : dict
+        dictionary of Settings to be used in the calculation (see, e.g., fifpy.MIF.Settings)
     
+    N_pp, k_pp, diffMAxmins_x,diffMaxmins_y are given as output of find_max_frequency2D
+
+    logM : list of 2 ints
+        mask length in 2D from the previous IMF, used to check whether the new calculated
+        mask is smaller than that.
+    countIMFs : int
+        if > 1, then a check on logM is performed. If 1, then no check is done since it is the
+        first IMC.
+    """ 
     if isinstance(options.alpha,str):
     
         if options.alpha == 'ave': 
@@ -589,13 +641,13 @@ def get_mask_length2D(options,N_pp,k_pp,diffMaxmins_x,diffMaxmins_y,logM,countIM
 
 def get_mask_2D_v3(w,k):
     """
+    get the mask with length 2*k+1 x 2*k+1
     
-    function A=get_mask_2D_v3(w,k)
-     
-      get the mask with length 2*k+1 x 2*k+1
-      k must be integer
-      w is the area under the curve for each bar
-      A  the mask with length 2*k+1 x 2*k+1
+    Parameters
+    ----------
+    k : integer, half mask length
+    w : is the area under the curve for each bar
+    output: a 2D mask with shape (2*k+1, 2*k+1)
     wrapped from FIF2_v3.m
     """
     #check if k tuple contains integers
@@ -628,7 +680,19 @@ def get_mask_2D_v3(w,k):
     return A
 
 def compute_imf2d_fft(f,a,options):
-        
+    """
+    Calculates the IMC from the  2D signal f using the 2D window function a.
+
+    Parameters
+    ----------
+    f : 2D array
+        input signal from which to extract the IMC
+    a : 2D array
+        input 2D window function
+    options : dict
+        dictionary of Settings to be used in the decomposition
+        (see fifpy.MIFpy.Settings)
+    """ 
 
     h = np.array(f)
     h_ave = np.zeros(len(h))

@@ -2,13 +2,15 @@ import numpy as np
 
 from scipy.integrate import trapz as integrate
 
-def aggregate_IMCs(imfs,freqs,freq_ranges,return_mean_freq = False):
+def aggregate_IMCs_MIF(imfs,freqs,freq_ranges,return_mean_freq = False):
     """
-    aggregate 2D IMF obtained from the MIF decomposition
-    according to frequency range given in input.
-    The frequency range defines the limits.
-    i.e. if frequency range contains two frequencies [f1,f2]
-    then it returns 3 aggregate imf. one contaning freqs. bewteen 0 and f1,
+    WARNING: this function is deprecated and it is kept for legacy purposes only. 
+    Use fifpy.fif_tools.orthogonalize instead
+    
+    Aggregate 2D IMF obtained from the MIF decomposition according to frequency range 
+    given in input. The frequency range defines the limits: i.e. if frequency range 
+    contains two frequencies [f1,f2] then it returns 3 aggregate imf: one contaning 
+    frequencies bewteen 0 and f1,
     the second between f1 and f2, and the last one containing all freqs.
     >f2.
 
@@ -137,8 +139,8 @@ def orthogonalize(imfs,threshold = 0.6, **kwargs):
         are aggregated/summed.
     **kwargs:
         auxiliary input to be passed to check_orthogonality()
-    WARNING: TESTED ONLY FOR 2D IMCS. IT SHOULD WORK WITH ND IMCS, PROVIDED 
-             THAT check_orthogonality HAS BEEN IMPLEMENTED TO WORK WITH ND 
+    WARNING: TESTED ONLY FOR 2D IMCS. IT WONT WORK WITH ND IMCS, SINCE 
+             check_orthogonality HAS NOT BEEN IMPLEMENTED YET TO WORK WITH ND 
              IMCS.
 
     """
@@ -161,8 +163,8 @@ def orthogonalize(imfs,threshold = 0.6, **kwargs):
 ##### SPECIFIC MvFIF tools #####
 def check_orthogonality_MvFIF(imfs,periodic=True, plot=False,only_nearest = False):
     """
-    calculate the orthogonality (cross-correlation) matrix M between the input imfs 
-    as given in output by MvIF / MvFIF.
+    calculate the orthogonality (cross-correlation) matrix M between the input IMCs "imfs" 
+    as given in output by MvIF / MvFIF decomposition.
 
         M_ij = Corr(imfs[i],imfs[j])
     
@@ -180,8 +182,6 @@ def check_orthogonality_MvFIF(imfs,periodic=True, plot=False,only_nearest = Fals
         plot the result
     only_nearest : bool
         if True only near imfs are checked for orthogonality.
-    WARNING: WORKS ONLY FOR 1D/2D IMCs. MUST BE IMPLEMENTED TO WORK 
-             WITH NDimensional IMCs.
 
     """
     from scipy.integrate import trapz as integrate
@@ -333,8 +333,7 @@ def IMC_get_freq_amp(IMF, dt = 1, resort = False, wshrink = 0, use_instantaneous
 
 def IMC_get_inst_freq_amp(IMF,dt):
     """
-    % Produces the istantaneous frequency and amplitude of a set of imfs.
-    % Adapted from FIFogram_v7.
+    # Produces the istantaneous frequency and amplitude of a set of imfs.
 
     """
     fs = 1/dt #sampling frequency
@@ -384,7 +383,9 @@ def IMC_get_inst_freq_amp(IMF,dt):
 
 
 def Maxmins_v3_6(x, mode = 'wrap'):
-
+    """
+    find relative maxima and minima in a 1D signal x
+    """
     from scipy.signal import argrelextrema
     maxima = argrelextrema(x, np.greater, mode = mode)
     minima = argrelextrema(x, np.less, mode = mode)
