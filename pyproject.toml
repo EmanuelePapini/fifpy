@@ -1,0 +1,37 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools","wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = []
+
+[project]
+name = "fifpy"
+version = "1.0.0"
+description = "Python Package for Iterative Filtering decomposition methods"
+readme = "README.md"
+authors = [{ name = "Emanuele Papini", email = "emanuele.papini@inaf.it" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["data analysis", "time series", "adaptive decomposition"]
+dependencies = [
+    "numpy >= 1.21.5",
+    "scipy >= 1.7.3",
+    "numba >= 0.55.1",
+    "attrdict",
+    "sys" , "random" , "matplotlib" , "sklearn" , "copy" , "time", "datetime" , 
+    "tomli",
+]
+requires-python = ">=3.8"
+
+[project.urls]
+Homepage = "https://github.com/EmanuelePapini/fifpy"
+
+[project.scripts]
+realpython = "reader.__main__:main"
