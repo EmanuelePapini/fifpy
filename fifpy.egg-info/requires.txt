@@ -1,6 +1,0 @@
-numpy
-scipy
-numba
-attrdict
-matplotlib
-scikit-learn
