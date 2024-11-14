@@ -9,10 +9,10 @@ py-modules = []
 
 [project]
 name = "fifpy"
-version = "1.0.1"
+version = "1.0.2"
 description = "Python Package for Iterative Filtering decomposition methods"
 readme = "README.md"
-requires-python = "<=3.12"
+requires-python = "<3.13"
 license = { file = "LICENSE" }
 authors = [{ name = "Emanuele Papini", email = "emanuele.papini@inaf.it" }]
 maintainers = [{ name = "Emanuele Papini", email = "emanuele.papini@inaf.it" }]
