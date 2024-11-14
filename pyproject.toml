@@ -9,7 +9,7 @@ py-modules = []
 
 [project]
 name = "fifpy"
-version = "1.0.0"
+version = "1.0.1"
 description = "Python Package for Iterative Filtering decomposition methods"
 readme = "README.md"
 requires-python = "<=3.12"
