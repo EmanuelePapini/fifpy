@@ -1,12 +1,6 @@
-numpy>=1.21.5
-scipy>=1.7.3
-numba>=0.55.1
+numpy
+scipy
+numba
 attrdict
-sys
-random
 matplotlib
-sklearn
-copy
-time
-datetime
-tomli
+scikit-learn

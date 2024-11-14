@@ -4,6 +4,5 @@ pyproject.toml
 fifpy.egg-info/PKG-INFO
 fifpy.egg-info/SOURCES.txt
 fifpy.egg-info/dependency_links.txt
-fifpy.egg-info/entry_points.txt
 fifpy.egg-info/requires.txt
 fifpy.egg-info/top_level.txt

@@ -3,6 +3,7 @@ Name: fifpy
 Version: 1.0.0
 Summary: Python Package for Iterative Filtering decomposition methods
 Author-email: Emanuele Papini <emanuele.papini@inaf.it>
+Maintainer-email: Emanuele Papini <emanuele.papini@inaf.it>
 License: MIT License
         
         Copyright (c) 2022 Emanuele Papini
@@ -27,24 +28,20 @@ License: MIT License
         
 Project-URL: Homepage, https://github.com/EmanuelePapini/fifpy
 Keywords: data analysis,time series,adaptive decomposition
+Classifier: Development Status :: 5 - Production/Stable
 Classifier: License :: OSI Approved :: MIT License
-Classifier: Programming Language :: Python
 Classifier: Programming Language :: Python :: 3
-Requires-Python: >=3.8
+Classifier: Topic :: Scientific/Engineering
+Classifier: Intended Audience :: Science/Research
+Requires-Python: <=3.12
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: numpy>=1.21.5
-Requires-Dist: scipy>=1.7.3
-Requires-Dist: numba>=0.55.1
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: numba
 Requires-Dist: attrdict
-Requires-Dist: sys
-Requires-Dist: random
 Requires-Dist: matplotlib
-Requires-Dist: sklearn
-Requires-Dist: copy
-Requires-Dist: time
-Requires-Dist: datetime
-Requires-Dist: tomli
+Requires-Dist: scikit-learn
 
 # FAST ITERATIVE FILTERING python module
 
