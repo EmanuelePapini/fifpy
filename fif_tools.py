@@ -1,6 +1,6 @@
 import numpy as np
 
-from scipy.integrate import trapz as integrate
+from scipy.integrate import trapezoid as integrate
 
 def aggregate_IMCs_MIF(imfs,freqs,freq_ranges,return_mean_freq = False):
     """
@@ -184,7 +184,6 @@ def check_orthogonality_MvFIF(imfs,periodic=True, plot=False,only_nearest = Fals
         if True only near imfs are checked for orthogonality.
 
     """
-    from scipy.integrate import trapz as integrate
 
     ndim = len(imfs.shape[2:])
 
