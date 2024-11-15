@@ -1,15 +1,22 @@
-# pyproject.toml
+# pyproject_pip.toml
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools","wheel"]
 build-backend = "setuptools.build_meta"
+#
+#[tool.hatch.build.targets.sdist]
+#only-include = ["src/fifpy/*"]
+#
+#[tool.hatch.build.targets.wheel]
+#sources = ["src"]
 
-[tool.setuptools]
-py-modules = []
+#[build-system]
+#requires = ["hatchling"]
+#build-backend = "hatchling.build"
 
 [project]
 name = "fifpy"
-version = "1.0.3"
+version = "0.1.6"
 description = "Python Package for Iterative Filtering decomposition methods"
 readme = "README.md"
 requires-python = "<3.13"
@@ -25,11 +32,19 @@ classifiers = [
 ]
 keywords = ["data analysis", "time series", "adaptive decomposition"]
 dependencies = [
-    "numpy",
-    "scipy",
     "numba",
     "attrdict",
-    "matplotlib" , "scikit-learn"]
+    "matplotlib" ,
+    "numpy",
+    "scipy",
+    "scikit-learn"]
+#dependencies = [
+#    "numba==0.55.1",
+#    "attrdict",
+#    "matplotlib==3.5.2" ,
+#    "numpy==1.21.6",
+#    "scipy==1.7.3",
+#    "scikit-learn==1.1.1"]
 
 [project.urls]
 Homepage = "https://github.com/EmanuelePapini/fifpy"
