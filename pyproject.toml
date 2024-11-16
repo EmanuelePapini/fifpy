@@ -16,7 +16,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fifpy"
-version = "0.1.7"
+version = "0.1.8"
 description = "Python Package for Iterative Filtering decomposition methods"
 readme = "README.md"
 requires-python = "<3.13"
