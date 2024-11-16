@@ -30,7 +30,7 @@ Dependencies: scipy, numpy, numba, scikit-learn, attrdict, matplotlib
 The package is available on PyPI. To install it simply type
 
 ```
-pip install fifpy
+pip install iterativefiltering
 ```
 
 
