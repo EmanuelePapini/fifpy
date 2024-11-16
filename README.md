@@ -1,3 +1,5 @@
+[![DOI](./aux/614504823.svg)](https://doi.org/10.5281/zenodo.14175320)
+
 # FAST ITERATIVE FILTERING - python package
 
 This package contains the python classes and methods for the Iterative Filtering (IF), Fast Iterative Filtering (FIF), Multidimensional Iterative Filtering (MIF), the Multivariate Iterative Filtering (MvFIF) and the Multivariate Fast Iterative Filtering (MvFIF) algorithms.
