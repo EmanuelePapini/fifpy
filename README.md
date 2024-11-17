@@ -1,4 +1,5 @@
-[![DOI](./aux/614504823.svg)](https://doi.org/10.5281/zenodo.14175320)
+[![DOI](https://zenodo.org/badge/614504823.svg)](https://doi.org/10.5281/zenodo.14175320)
+
 
 # FAST ITERATIVE FILTERING - python package
 
