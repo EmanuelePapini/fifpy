@@ -9,6 +9,12 @@
 """
 
 
+import collections
+import collections.abc
+for type_name in collections.abc.__all__:
+    setattr(collections, type_name, getattr(collections.abc, type_name))
+
+
 
 from . import fif_tools as ftools
 
