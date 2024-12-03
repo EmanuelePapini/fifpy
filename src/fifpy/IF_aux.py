@@ -380,85 +380,189 @@ def compute_imf_fft(f,a,options):
 
     return h,inStepN,SD
 
+
+
 def compute_imf_fft_adv(f,a,options):
     """
-    slightly faster since it spares the calculation of 1fft per iteration
-    WARNING: IT DOESN'T WORK FOR SCIPY NEW VERSIONS (python>3.10.xx) 
-    """
-    from scipy.signal.signaltools import _init_freq_conv_axes, _centered
-    from scipy import fft as sp_fft
+    Extracts the imf from the signal f using the window function (mask) a,
+    according to the settings specified in the options dict
     
+    N.B. This calculation is done via convolution of f with a in Fourier space,
+    using scipy.signal.fftconvolve
+    
+    Parameters
+    ----------
+    f : 1D float array
+        input signal
+    a : 1D float array
+        window function
+    
+    options : dict
+        dictionary containing the settings of the decomposition 
+        (see, e.g.,  fifpy.IFpy.Settings method).
+        mandatory keyword in options:
+        'delta' : minimum difference in the 2norm between the two iterations
+        'MaxInner': maximum number of iterations
+        'verbose' : verbosity level 
+    """
+        
+    from scipy.signal import fftconvolve
+
     h = np.array(f)
-    h_ave = np.zeros(len(h))
 
     kernel = a
     delta = options.delta
     MaxInner = options.MaxInner
-    
+    BCmod = options.BCmode
+    NumSteps = options.NumSteps if 'NumSteps' in options else 1 
         
     inStepN = 0
     SD = 1.
     
     Nh = len(h)
-    #setting machinery for fftconvolve directly wrapped from scipy.signal.signaltools
-    in1 = h; in2 = kernel
-    if in1.ndim == in2.ndim == 0:  # scalar inputs
-        return in1 * in2
-    elif in1.size == 0 or in2.size == 0:  # empty arrays
-        return np.array([])
-    in1, in2, axes = _init_freq_conv_axes(in1, in2, 'same', None,
-                                          sorted_axes=False)
-    s1 = in1.shape
-    s2 = in2.shape
+    if BCmod == 'wrap':
+        ker = kernel
+        if f.shape[0] <ker.shape[0]:
+            print('error, kernel shape cannot be larger than 1D array shape')
+            return None
+        #computing FFT of kernel function
+        m = ker.shape[0]//2
+        kpad = np.pad(ker,((0,f.shape[0]-ker.shape[0])))
+        kpad = np.roll(kpad,-m)
+        kpad_fft = np.fft.rfft(kpad)
+        h_fft = np.fft.rfft(h)
+        while SD>delta and inStepN<MaxInner:
+            inStepN += NumSteps
+            
+            fft_h_old = (1-kpad_fft)**(inStepN-1) * h_fft
+            fft_h_new = (1-kpad_fft)**inStepN * h_fft
 
-    shape = [max((s1[i], s2[i])) if i not in axes else s1[i] + s2[i] - 1
-             for i in range(in1.ndim)]
+            #computing norm using Parceval Thm
+            SD = np.sum(np.abs(fft_h_new-fft_h_old)**2)/np.sum(np.abs(fft_h_old)**2)
+            if options.verbose:
+                print('(fft): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+        h = np.fft.irfft(fft_h_new,n=f.shape[0])
     
-    calc_fast_len=True
-    if not len(axes):
-        return in1 * in2
-
-    complex_result = (in1.dtype.kind == 'c' or in2.dtype.kind == 'c')
-
-    if calc_fast_len:
-        # Speed up FFT by padding to optimal size.
-        fshape = [
-            sp_fft.next_fast_len(shape[a], not complex_result) for a in axes]
     else:
-        fshape = shape
+        while SD>delta and inStepN<MaxInner:
+            inStepN += 1
+            h_ave = fftconvolve(h,kernel,mode='same')
+            #computing norm
+            #SD = np.sum(h_ave**2)/np.sum(h**2)
+            SD = LA.norm(h_ave)**2/LA.norm(h)**2
 
-    if not complex_result:
-        fft, ifft = sp_fft.rfftn, sp_fft.irfftn
-    else:
-        fft, ifft = sp_fft.fftn, sp_fft.ifftn
-
-    #sp1 = fft(in1, fshape, axes=axes)
-    sp2 = fft(in2, fshape, axes=axes)
-
+            h[:] = h[:] - h_ave[:]
+            h_ave[:] = 0
+            if options.verbose:
+                print('(fft): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
     
-    while SD>delta and inStepN<MaxInner:
-        inStepN += 1
-        sp1 = fft(in1, fshape, axes=axes)
-        ret = ifft(sp1 * sp2, fshape, axes=axes)
-        if calc_fast_len:
-            fslice = tuple([slice(sz) for sz in shape])
-            ret = ret[fslice]
-    
-        h_ave =  _centered(ret, s1).copy() 
+#        ker = kernel
+#        ker_shape = ker.shape[0]
+#        h_shape = h.shape[0]
+#        fftshape = h_shape +ker_shape - 1
+#        startind = fftshape - h_shape
+#        endind = startind + h_shape
+#        kpad_fft =np.fft.rfft(ker,n=fftshape)
+#        h_fft = np.fft.rfft(h,n=fftshape)
+#        
+#        while SD>delta and inStepN<MaxInner:
+#            inStepN += NumSteps
+#            
+#            fft_h_old = (1-kpad_fft)**(inStepN-1) * h_fft
+#            fft_h_new = (1-kpad_fft)**inStepN * h_fft
 
-        #computing norm
-        SD = LA.norm(h_ave)**2/LA.norm(h)**2
-        h[:] = h[:] - h_ave[:]
-        h_ave[:] = 0
-        if options.verbose:
-            print('(fft adv): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
-    
+#            #computing norm using Parceval Thm
+#            SD = np.sum(np.abs(fft_h_new-fft_h_old)**2)/np.sum(np.abs(fft_h_old)**2)
+#            if options.verbose:
+#                print('(fft): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+        
+#        h = np.fft.irfft(fft_h_new,n=fftshape)[startind:endind]
 
     
     if options.verbose:
-        print('(fft adv): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+        print('(fft): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
 
     return h,inStepN,SD
+
+#def compute_imf_fft_adv(f,a,options):
+#    """
+#    slightly faster since it spares the calculation of 1fft per iteration
+#    WARNING: IT DOESN'T WORK FOR SCIPY NEW VERSIONS (python>3.10.xx) 
+#    """
+#    from scipy.signal.signaltools import _init_freq_conv_axes, _centered
+#    from scipy import fft as sp_fft
+#    
+#    h = np.array(f)
+#    h_ave = np.zeros(len(h))
+#
+#    kernel = a
+#    delta = options.delta
+#    MaxInner = options.MaxInner
+#    
+#        
+#    inStepN = 0
+#    SD = 1.
+#    
+#    Nh = len(h)
+#    #setting machinery for fftconvolve directly wrapped from scipy.signal.signaltools
+#    in1 = h; in2 = kernel
+#    if in1.ndim == in2.ndim == 0:  # scalar inputs
+#        return in1 * in2
+#    elif in1.size == 0 or in2.size == 0:  # empty arrays
+#        return np.array([])
+#    in1, in2, axes = _init_freq_conv_axes(in1, in2, 'same', None,
+#                                          sorted_axes=False)
+#    s1 = in1.shape
+#    s2 = in2.shape
+#
+#    shape = [max((s1[i], s2[i])) if i not in axes else s1[i] + s2[i] - 1
+#             for i in range(in1.ndim)]
+#    
+#    calc_fast_len=True
+#    if not len(axes):
+#        return in1 * in2
+#
+#    complex_result = (in1.dtype.kind == 'c' or in2.dtype.kind == 'c')
+#
+#    if calc_fast_len:
+#        # Speed up FFT by padding to optimal size.
+#        fshape = [
+#            sp_fft.next_fast_len(shape[a], not complex_result) for a in axes]
+#    else:
+#        fshape = shape
+#
+#    if not complex_result:
+#        fft, ifft = sp_fft.rfftn, sp_fft.irfftn
+#    else:
+#        fft, ifft = sp_fft.fftn, sp_fft.ifftn
+#
+#    #sp1 = fft(in1, fshape, axes=axes)
+#    sp2 = fft(in2, fshape, axes=axes)
+#
+#    
+#    while SD>delta and inStepN<MaxInner:
+#        inStepN += 1
+#        sp1 = fft(in1, fshape, axes=axes)
+#        ret = ifft(sp1 * sp2, fshape, axes=axes)
+#        if calc_fast_len:
+#            fslice = tuple([slice(sz) for sz in shape])
+#            ret = ret[fslice]
+#    
+#        h_ave =  _centered(ret, s1).copy() 
+#
+#        #computing norm
+#        SD = LA.norm(h_ave)**2/LA.norm(h)**2
+#        h[:] = h[:] - h_ave[:]
+#        h_ave[:] = 0
+#        if options.verbose:
+#            print('(fft adv): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+#    
+#
+#    
+#    if options.verbose:
+#        print('(fft adv): %2.0d      %1.40f          %2.0d\n' % (inStepN, SD, np.size(a)))
+#
+#    return h,inStepN,SD
 
 def fftconvolve1D(f,ker):#, mode = 'same', BCmode = 'wrap'):
     """

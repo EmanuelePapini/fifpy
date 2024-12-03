@@ -81,7 +81,7 @@ def Settings(**kwargs):
     options['NumSteps']=1 #number of internal steps in IF loop between two FFTs
     options['BCmode'] = 'clip' #BCmode: boundary of the signal (if periodic is 'wrap')
     options['Maxmins_method'] = 'zerocrossing' #see Maxmins in IF_aux
-    options['imf_method'] = 'fft' #numba #select the numerical method for computation
+    options['imf_method'] = 'fft_adv' #fft #numba #select the numerical method for computation
     options['MaxlogM'] = None # Maximum allowed mask length (If None then this value is
                               # automatically set to the length of the timeseries.
     for i in kwargs:
@@ -145,7 +145,8 @@ def IterativeFiltering(f,options,M=np.array([]), window_mask=None, data_mask = N
 
     if opts.imf_method == 'fft': 
         compute_imf = compute_imf_fft
-        #compute_imf = compute_imf_fft_adv
+    elif opts.imf_method == 'fft_adv':
+        compute_imf = compute_imf_fft_adv
     elif opts.imf_method == 'numba': 
         compute_imf = compute_imf_numba
 
