@@ -18,8 +18,7 @@ from numba import njit,prange,get_num_threads,set_num_threads
 from .prefixed_double_filter import MM as FKmask
 FKmask = np.array(FKmask)
 
-from attrdict import AttrDict
-AttrDictSens = AttrDict
+from .attrdict import *
 
 
 @njit

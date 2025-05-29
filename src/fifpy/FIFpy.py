@@ -4,7 +4,7 @@ from numpy import linalg as LA
 from scipy.signal import argrelextrema 
 from numpy import fft
 from numba import jit
-from .IF_aux import FKmask
+from .IF_aux import FKmask, AttrDictSens
 
 __version__='2.14'
 
@@ -37,41 +37,6 @@ def movmean(f,n):
 
     return y
     
-
-class AttrDictSens(dict):
-    '''
-    A case-sensitive dictionary with access via item, attribute, and call
-    notations:
-
-        >>> d = AttrDict()
-        >>> d['Variable'] = 123
-        >>> d['Variable']
-        123
-        >>> d.Variable
-        123
-        >>> d.variable
-        123
-        >>> d('VARIABLE')
-        123
-    '''
-
-    def __init__(self, init={}):
-        dict.__init__(self, init)
-
-    def __getitem__(self, name):
-        try :
-            return super(AttrDictSens, self).__getitem__(name)
-        except:
-            raise AttributeError
-
-    def __setitem__(self, key, value):
-        return super(AttrDictSens, self).__setitem__(key, value)
-
-    __getattr__ = __getitem__
-    __setattr__ = __setitem__
-    __call__ = __getitem__
-
-
 
 def get_mask_v1_1(y, k,verbose,tol):
     """

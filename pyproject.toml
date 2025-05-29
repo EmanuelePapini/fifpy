@@ -33,7 +33,6 @@ classifiers = [
 keywords = ["data analysis", "time series", "adaptive decomposition"]
 dependencies = [
     "numba",
-    "attrdict",
     "matplotlib" ,
     "numpy",
     "scipy",

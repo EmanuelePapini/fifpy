@@ -1,17 +1,17 @@
 """
  Fast Iterative Filtering python package
 
- Dependencies : numpy, scipy, numba, pylab, attrdict
+ Dependencies : numpy, scipy, numba, pylab
 
  Authors: 
     Python version: Emanuele Papini - INAF (emanuele.papini@inaf.it) 
     Original matlab version: Antonio Cicone - university of L'Aquila (antonio.cicone@univaq.it)
 """
-# Monkey patch collections to fix incompatibility with attrdict
-import collections
-import collections.abc
-for type_name in collections.abc.__all__:
-    setattr(collections, type_name, getattr(collections.abc, type_name))
+## Monkey patch collections to fix incompatibility with attrdict
+#import collections
+#import collections.abc
+#for type_name in collections.abc.__all__:
+#    setattr(collections, type_name, getattr(collections.abc, type_name))
 
 
 from . import fif_tools as ftools
@@ -115,7 +115,7 @@ class FIF():
                       'MaxInner' : MaxInner, 'MonotoneMaskLength' : MonotoneMaskLength,\
                       'Xi' : Xi}
 
-        if self.__version__ == '2.13':
+        if self.__version__ == '2.14':
             self.options = FIFpy.Settings(**self.options)
 
         self.FIFpy = FIFpy
@@ -473,8 +473,10 @@ class MvIF(MvFIF):
         Parameters
         ----------
         
-        in_f : 1d array of float (size(N))
-            input signal to be decomposed
+        in_f : 2d array of float (size(D,N))
+            input multivariate signal to be decomposed
+            D : number of channels
+            N : length of the signal
         
         preprocess : str
             allowed values : 'make-periodic', 'extend-periodic', None

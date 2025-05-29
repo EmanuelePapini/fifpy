@@ -14,10 +14,10 @@
 
 
 import numpy as np
-from attrdict import AttrDict as AttrDictSens
+#from attrdict import AttrDict as AttrDictSens
 
 from .IF_aux import FKmask, find_max_frequency2D, \
-    get_mask_length2D, get_mask_2D_v3, compute_imf2d_fft
+    get_mask_length2D, get_mask_2D_v3, compute_imf2d_fft, AttrDict, AttrDictSens
 
 __version__='8.4'
 

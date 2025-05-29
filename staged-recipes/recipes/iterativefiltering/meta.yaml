@@ -23,7 +23,6 @@ requirements:
   run:
     - python <3.13
     - numba
-    - attrdict
     - matplotlib-base
     - numpy
     - scipy

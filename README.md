@@ -27,7 +27,7 @@ This repository is a complete rewriting of the original matlab codes by A. Cicon
 ### Dependencies ###
 The package has been written and tested in python3.8, should be compatible with python <3.13, due to requirement from numba.
 
-Dependencies: scipy, numpy, numba, scikit-learn, attrdict, matplotlib
+Dependencies: scipy, numpy, numba, scikit-learn, matplotlib
 
 ### Install ###
 

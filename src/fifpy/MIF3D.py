@@ -16,7 +16,7 @@
 import numpy as np
 from numpy import linalg as LA
 from numba import njit,prange,get_num_threads,set_num_threads
-from attrdict import AttrDict as AttrDictSens
+from .attrdict import AttrDict as AttrDictSens
 
 from .IF_aux import FKmask 
 __version__='3e'
