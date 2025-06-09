@@ -192,7 +192,7 @@ def FIF_v2_13(f,options,M=np.array([]),window_mask=None, data_mask = None):
         print('Signal too small')
         return None,None
 
-    maxmins_pp = Maxmins(np.concatenate([f_pp, f_pp[:10]]),tol,mode='wrap')    
+    maxmins_pp = Maxmins(np.concatenate([f_pp, f_pp[:10]]),tol)    
     maxmins_pp = maxmins_pp[0] 
     if len(maxmins_pp) < 1:
         print('No extrema detected')
@@ -330,9 +330,9 @@ def FIF_v2_13(f,options,M=np.array([]),window_mask=None, data_mask = None):
             break
         
         if stats.logM[-1]>=20: 
-            maxmins_pp = Maxmins(movmean(np.concatenate([f_pp,f_pp[:10]]),10),tol,mode='wrap')[0]
+            maxmins_pp = Maxmins(movmean(np.concatenate([f_pp,f_pp[:10]]),10),tol)[0]
         else:    
-            maxmins_pp = Maxmins(np.concatenate([f_pp,f_pp[:10]]),tol,mode='wrap')[0]
+            maxmins_pp = Maxmins(np.concatenate([f_pp,f_pp[:10]]),tol)[0]
         
         if maxmins_pp is None:
             break
@@ -354,104 +354,104 @@ def FIF_v2_13(f,options,M=np.array([]),window_mask=None, data_mask = None):
 
 
 
-def Maxmins(x,tol,mode='wrap'):
-    """
-    Wrapped from: Maxmins_v3_8 in FIF_v2_13.m
-    """
-    @jit(nopython=True) 
-    def maxmins_wrap(x,df, N,Maxs,Mins):
 
-        h = 1
-        while h<N and np.abs(df[h]/x[h]) <= tol:
-            h = h + 1
-   
-        if h==N:
-            return None, None
+def Maxmins_v3_8(x, tol):
+    """
+    Identify the maxima and minima of a signal f.
+    Python translation of the MATLAB Maxmins_v3_8 function.
+    Returns:
+        maxmins (np.ndarray): Indices of maxima and minima (1-based, as in MATLAB).
+        Maxs (np.ndarray): Indices of maxima.
+        Mins (np.ndarray): Indices of minima.
+    """
+    f = np.asarray(x, dtype=float).flatten()
+    N = len(f)
+    Maxs = np.zeros(N, dtype=int)
+    Mins = np.zeros(N, dtype=int)
+    df = np.diff(f)
+    
+    h = 0
+    while h < N-1 and abs(df[h] / f[h]) <= tol:
+        h += 1
+    if h == N-1:
+        return None, None, None
+
+    #@jit(nopython=True)
+    def maxmins_wrap(df, f_ext,h,N,Maxs,Mins,tol):
 
         cmaxs = 0
         cmins = 0
         c = 0
         N_old = N
-        
-        df = np.zeros(N+h)
-        df[0:N] = x
-        df[N:N+h] = x[1:h+1]
-        for i in range(N+h-1):
-            df[i] = df[i+1] - df[i]
-        
-        f = np.zeros(N+h-1)
-        f[0:N] = x
-        f[N:] = f[1:h]
-        
-        N = N+h
-        #beginfor
-        for i in range(h-1,N-2):
-            if abs(df[i]*df[i+1]/f[i]**2) <= tol :
-                if df[i]/abs(f[i]) < -tol:
+
+        N = N + h
+
+        last_df = None
+        posc = None
+        for i in range(h, N-1):
+            rel_df = df[i] / abs(f_ext[i]) if abs(f_ext[i]) > 0 else 0
+            rel_df_next = df[i+1] / abs(f_ext[i]) if abs(f_ext[i]) > 0 else 0
+            cond1 = df[i] * df[i+1] / (abs(f_ext[i])**2) if abs(f_ext[i]) > 0 else 0
+
+            if -tol <= cond1 <= tol:
+                if rel_df < -tol:
                     last_df = -1
                     posc = i
-                elif df[i]/abs(f[i]) > tol:
+                elif rel_df > tol:
                     last_df = +1
                     posc = i
                 elif df[i] == 0:
                     last_df = 0
                     posc = i
-
-                c = c+1
-
-                if df[i+1]/abs(f[i]) < -tol:
-                    if last_df == 1 or last_df == 0:
-                        cmaxs = cmaxs +1
-                        Maxs[cmaxs] = (posc + (c-1)//2 +1)%N_old
+                c += 1
+                if rel_df_next < -tol:
+                    if last_df == +1 or last_df == 0:
+                        cmaxs += 1
+                        idx = (posc + (c-1)//2 + 1) % N_old
+                        Maxs[cmaxs-1] = idx if idx != 0 else N_old
                     c = 0
-                
-                if df[i+1]/abs(f[i]) > tol:
+                if rel_df_next > tol:
                     if last_df == -1 or last_df == 0:
-                        cmins = cmins +1
-                        Mins[cmins] = (posc + (c-1)//2 +1)%N_old
+                        cmins += 1
+                        idx = (posc + (c-1)//2 + 1) % N_old
+                        Mins[cmins-1] = idx if idx != 0 else N_old
                     c = 0
 
-            if df[i]*df[i+1]/f[i]**2 < -tol:
-                if df[i]/abs(f[i]) < -tol and df[i+1]/abs(f[i]) > tol:
-                    cmins  =cmins+1
-                    Mins[cmins] = (i+1)%N_old
-                    if Mins[cmins]==0:
-                        Mins[cmins]=1
-                    last_df=-1
+            if cond1 < -tol:
+                if rel_df < -tol and rel_df_next > tol:
+                    cmins += 1
+                    idx = (i+1) % N_old
+                    Mins[cmins-1] = idx if idx != 0 else 1
+                    last_df = -1
+                elif rel_df > tol and rel_df_next < -tol:
+                    cmaxs += 1
+                    idx = (i+1) % N_old
+                    Maxs[cmaxs-1] = idx if idx != 0 else 1
+                    last_df = +1
 
-                elif df[i]/abs(f[i]) > tol and df[i+1]/abs(f[i])  < -tol:
-                    cmaxs = cmaxs+1
-                    Maxs[cmaxs] = (i+1)%N_old
-                    if Maxs[cmaxs] == 0:
-                        Maxs[cmaxs]=1
-            
-                    last_df =+1
-
-        if c>0:
-            if cmins>0 and Mins[cmins] == 0 : Mins[cmins] = N
-            if cmaxs>0 and Maxs[cmaxs] == 0 : Maxs[cmaxs] = N
-
-        return Maxs[0:cmaxs], Mins[0:cmins]
-
-    N = np.size(x)
-
-    Maxs = np.zeros(N)
-    Mins = np.zeros(N)
+        if c > 0:
+            if cmins > 0 and Mins[cmins-1] == 0:
+                Mins[cmins-1] = N
+            if cmaxs > 0 and Maxs[cmaxs-1] == 0:
+                Maxs[cmaxs-1] = N
+        return Maxs[:cmaxs], Mins[:cmins]
+    #Maxs = Maxs[:cmaxs]
+    #Mins = Mins[:cmins]
+    df = np.diff(np.concatenate([f, f[1:h+2]]))
+    f_ext = np.concatenate([f, f[1:h+1]])
     
-    df = np.diff(x)
+    # If x is large, use jit-compiled version
+    if x.size > 150000:
+        maxmins_wrap = jit(nopython=True)(maxmins_wrap)
+    Maxs, Mins = maxmins_wrap( df, f_ext,h, N, Maxs, Mins,tol)
+    maxmins = np.sort(np.concatenate([Maxs, Mins]))
 
-    if mode == 'wrap':
-        Maxs, Mins = maxmins_wrap(x,df,N,Maxs,Mins)
-        if Maxs is None or Mins is None:
-            return None,None,None
+    #Maxs[Maxs == 0] = 1
+    #Mins[Mins == 0] = 1
+    #maxmins[maxmins == 0] = 1
 
-        maxmins = np.sort(np.concatenate((Maxs,Mins) ))
-        
-        if any(Mins ==0): Mins[Mins == 0] = 1
-        if any(Maxs ==0): Maxs[Maxs == 0] = 1
-        if any(maxmins ==0): maxmins[maxmins == 0] = 1
+    return maxmins, Maxs, Mins
 
-    return maxmins,Maxs,Mins
 
 
 def evaluate_residual(fh,fm,j):
