@@ -355,7 +355,7 @@ def FIF_v2_13(f,options,M=np.array([]),window_mask=None, data_mask = None):
 
 
 
-def Maxmins_v3_8(x, tol):
+def Maxmins(x, tol):
     """
     Identify the maxima and minima of a signal f.
     Python translation of the MATLAB Maxmins_v3_8 function.
