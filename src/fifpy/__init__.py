@@ -142,7 +142,6 @@ class FIF():
 
         """
         self.data = {}
-        
         self.data['IMC'], self.data['stats_list'] = self.FIFpy.FIF_run(in_f, M = M,\
             options = self.options,**kwargs)
 
@@ -263,16 +262,17 @@ class MvFIF(FIF):
         toggle verbosity
     """
 
-    def __init__(self, delta=0.001, alpha=30, NumSteps=1, ExtPoints=3, NIMFs=200, \
-                       MaxInner=200, Xi=1.6, MonotoneMaskLength=True, verbose = False):
+    def __init__(self, **kwargs):
+        """
+        initialize MultiVariate Fast Iterative Filtering Class.
+        For kwargs options please look at the Settings method in fifpy.MvIFpy
+        """
 
 
-        self.__version__=FIFpy.__version__
+        self.__version__=MvFIFpy.__version__
+        self.options = MvFIFpy.Settings(**kwargs)
 
-        self.options={'delta' : delta, 'alpha' : alpha, 'verbose' : verbose, \
-                      'NumSteps' : NumSteps, 'ExtPoints' : ExtPoints, 'NIMFs' : NIMFs, \
-                      'MaxInner' : MaxInner, 'MonotoneMaskLength' : MonotoneMaskLength,\
-                      'Xi' : Xi}
+
 
         self.FIFpy = MvFIFpy
    

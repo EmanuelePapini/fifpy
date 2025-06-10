@@ -23,27 +23,25 @@ def Settings(**kwargs):
 
     options = {}
     # General 
-    options['verbose'] = False #toggle verbosity level.
-    options['delta'] = 0.001 #SC1: threshold in the difference of 2Norm 
-    options['ExtPoints']=3 #SC2: minimum number of extrema
-    options['NIMFs']=200 #SC3: maximum number of IMF to be extracted
-    options['MaxInner']=200 #SC4: maximum number of iterations
+    options['verbose']            = False #toggle verbosity level.
+    options['delta']              = 0.001 #SC1: threshold in the difference of 2Norm 
+    options['ExtPoints']          =3 #SC2: minimum number of extrema
+    options['NIMFs']              =200 #SC3: maximum number of IMF to be extracted
+    options['MaxInner']           =200 #SC4: maximum number of iterations
     
-    options['Xi']=1.6 #stretching factor of the mask
-    options['alpha']='ave' #sets how to calculate the masklength from freq. distribution
-    options['MonotoneMaskLength']=True #sets if a monotone mask length is forced
-    options['MaskLengthType']='angle' #sets if a monotone mask length is forced
-    options['NumSteps']=1 #number of internal steps in IF loop between two FFTs
-    options['fft'] = 'pyfftw' #numba #select the numerical method for computation
-    options['threads'] = None #numba #select the numerical method for computation
-                              # automatically set to the length of the timeseries.
+    options['Xi']                 =1.6 #stretching factor of the mask
+    options['alpha']              ='ave' #sets how to calculate the masklength from freq. distribution
+    options['MonotoneMaskLength'] =True #sets if a monotone mask length is forced
+    options['MaskLengthType']     ='angle' #sets if a monotone mask length is forced
+    options['NumSteps']           =1 #number of internal steps in IF loop between two FFTs
+    options['fft']                = 'pyfftw' #numba #select the numerical method for computation
+    options['threads']            = None #numba #select the numerical method for computation
     for i in kwargs:
         if i in options.keys() : options[i] = kwargs[i] 
     return AttrDictSens(options)
 
 #WRAPPER (version unaware. To be called by MvFIF.py) 
 def FIF_run(x,  options=None, **kwargs):
-    
     if options is None:
         options = Settings()
     
@@ -67,10 +65,23 @@ def MvFIF(x, options,M=np.array([]),data_mask = None, window_mask=None):
     """
     print('running MvFIF decomposition...')
     #unpacking the options dict
-    locals().update(options)
+    #locals().update(options)
     #for ikey in options:
     #    locals()[ikey] = options[ikey]
-
+    
+    verbose           = options['verbose']            
+    delta             = options['delta']              
+    ExtPoints         = options['ExtPoints']          
+    NIMFs             = options['NIMFs']              
+    MaxInner          = options['MaxInner']           
+                        
+    Xi                = options['Xi']                 
+    alpha             = options['alpha']              
+    MonotoneMaskLength= options['MonotoneMaskLength'] 
+    MaskLengthType    = options['MaskLengthType']     
+    NumSteps          = options['NumSteps']           
+    fft               = options['fft']                
+    threads           = options['threads']            
     if fft =='pyfftw':
         print('using pyfftw...')
         import pyfftw
