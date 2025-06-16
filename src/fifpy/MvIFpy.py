@@ -94,6 +94,8 @@ def Settings(**kwargs):
     options['Maxmins_method'] = 'zerocrossing'
     options['imf_method'] = 'fft' #numba
     options['MaskLengthType'] = 'amp'
+    options['MaxlogM'] = None # Maximum allowed mask length (If None then this value is
+                          # automatically set to the length of the timeseries.
     for i in kwargs:
         if i in options.keys() : options[i] = kwargs[i] 
     options['MaskLengthType'] = 'amp'
@@ -155,6 +157,7 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
     if opts.MaskLengthType == 'amp': 
         if not silent: print('using amplitude to calculate mask')
         tol = 1e-18
+    MaxlogM = np.size(f) if opts.MaxlogM is None else opts.MaxlogM    
     #loading master filter
     ift = opts.timeit
     if ift: 
@@ -206,7 +209,17 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
             m = get_mask_length(opts,N_pp,k_pp,diffMaxmins_pp,logM,countIMFs)
         else:
             m = M[countIMFs-1]
-        
+        if N < 2*m+1: 
+            if opts.verbose: 
+                print('Mask length %d exceeds signal length %d. Finishing...'%(2*m+1,N))
+            countIMFs -= 1
+            break
+        if logM > MaxlogM:
+            if opts.verbose: print('Mask length exceeds Maximum allowed length, Finishing...')
+            countIMFs -= 1
+            break        
+
+
         if opts.verbose:
             print('\n IMF # %1.0d   -   # Extreme points %5.0d\n' %(countIMFs,k_pp))
             print('\n  step #            SD             Mask length \n\n')

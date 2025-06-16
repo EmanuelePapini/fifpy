@@ -36,6 +36,8 @@ def Settings(**kwargs):
     options['NumSteps']           =1 #number of internal steps in IF loop between two FFTs
     options['fft']                = 'pyfftw' #numba #select the numerical method for computation
     options['threads']            = None #numba #select the numerical method for computation
+    options['MaxlogM'] = None # Maximum allowed mask length (If None then this value is
+                          # automatically set to the length of the timeseries.    
     for i in kwargs:
         if i in options.keys() : options[i] = kwargs[i] 
     return AttrDictSens(options)
@@ -82,6 +84,7 @@ def MvFIF(x, options,M=np.array([]),data_mask = None, window_mask=None):
     NumSteps          = options['NumSteps']           
     fft               = options['fft']                
     threads           = options['threads']            
+    MaxlogM           = options['MaxlogM']
     if fft =='pyfftw':
         print('using pyfftw...')
         import pyfftw
@@ -101,6 +104,7 @@ def MvFIF(x, options,M=np.array([]),data_mask = None, window_mask=None):
     D,N = f.shape
     IMF = np.zeros([NIMFs+1, D, N])
     
+    if MaxlogM is None: MaxlogM = np.size(f)
 
     ###############################################################
     #                   Iterative Filtering                       #
@@ -157,6 +161,7 @@ def MvFIF(x, options,M=np.array([]),data_mask = None, window_mask=None):
     stats_list = []
     
     ssend = '\r'
+    logM = 1
     ### Begin Iterating ###
     while countIMFs < NIMFs and k_pp >= ExtPoints:
         
@@ -196,6 +201,15 @@ def MvFIF(x, options,M=np.array([]),data_mask = None, window_mask=None):
                             print('The old mask length is %1d whereas the new one is %1d.\n' % (stats['logM'][-1], m))
         else:
             m = M[countIMFs-1]
+        #if N < 2*m+1: 
+        #    if verbose: 
+        #        print('Mask length %d exceeds signal length %d. Finishing...'%(2*m+1,N))
+        #    countIMFs -= 1
+        #    break
+        if logM > MaxlogM:
+            if verbose: print('Mask length exceeds Maximum allowed length, Finishing...')
+            countIMFs -= 1
+            break        
 
         inStepN = 0
         if verbose:
@@ -204,7 +218,7 @@ def MvFIF(x, options,M=np.array([]),data_mask = None, window_mask=None):
 
         stats = {'logM': [], 'posF': [], 'valF': [], 'inStepN': [], 'diffMaxmins_pp': []}
         stats['logM'].append(int(m))
-
+        logM = int(m)
         a = get_mask_v1_1(MM, m,verbose,tol)#
         ExtendSig = False
         

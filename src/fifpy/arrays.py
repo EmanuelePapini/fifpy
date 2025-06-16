@@ -116,6 +116,37 @@ def extend_signal(sig,npad, mode = 'asymw-periodic',npad_raisedcos = None,**kwar
 
        
         return new_sig
+    if mode == 'symw-periodic':
+        
+        shape = np.shape(sig)
+        new_sig = np.pad(sig, npad, mode = 'symmetric',**kwargs) 
+        newshape=new_sig.shape
+        if len(shape) == 1:
+            mean = np.mean(new_sig)
+        
+            rs = raised_cosine(npad_rs,endpoint=True)
+        
+            new_sig[0:npad_rs] = (new_sig[0:npad_rs] - mean)*rs +mean
+            new_sig[-npad_rs:] = (new_sig[-npad_rs:] - mean)*np.flip(rs) + mean
+       
+        else:
+            new_sig=new_sig.reshape( (np.prod(newshape[0:-1]),newshape[-1]) )
+            
+            mean = np.mean(new_sig,axis=-1) 
+            
+            rsl = raised_cosine(npad_rs[-1][0])
+            rsr = np.flip(raised_cosine(npad_rs[-1][-1]))
+            
+            for i in range(new_sig.shape[0]): 
+                new_sig[i,0:npad_rs[-1][0]] = (new_sig[i,0:npad_rs[-1][0]] \
+                                                - mean[i])*rsl +mean[i]
+                new_sig[i,-npad_rs[-1][-1]:] = (new_sig[i,-npad_rs[-1][-1]:] \
+                                                - mean[i])*rsr + mean[i]
+
+            new_sig.reshape(newshape)
+
+       
+        return new_sig
     
     return np.pad(sig, npad, mode = mode,**kwargs)
 
