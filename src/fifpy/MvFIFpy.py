@@ -205,7 +205,7 @@ def MvFIF(x, options,M=np.array([]),data_mask = None, window_mask=None):
         stats = {'logM': [], 'posF': [], 'valF': [], 'inStepN': [], 'diffMaxmins_pp': []}
         stats['logM'].append(int(m))
 
-        a = get_mask_v1_1(MM, m)#
+        a = get_mask_v1_1(MM, m,verbose,tol)#
         ExtendSig = False
         
         if N < np.size(a):
@@ -326,8 +326,8 @@ def MvFIF(x, options,M=np.array([]),data_mask = None, window_mask=None):
     IMF = IMF[0:countIMFs+1]
     IMF[countIMFs] = f
 
-    if verbose:
-        print('Elapsed time (sec): ',time()-tstart)
+    #if verbose:
+    #    print('Elapsed time (sec): ',time()-tstart)
     print('IMFs extracted: ', countIMFs)
     return IMF, stats_list
 
