@@ -129,7 +129,6 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
         strongly recomended to provide a highly-resolved window-mask.
     data_mask : None or boolean array of size x
         used to mask data that wont be used to determine the size of the window mask (LogM).
-        TO BE IMPLEMENTED
     nthreads : int
         number of threads to be used if numba option was selected in options['imf_method']
 
@@ -187,8 +186,9 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
     if opts.MaskLengthType == 'amp': 
         k_pp=N
         for ic in range(D):
+            f_pp = np.delete(f[ic],data_mask) if data_mask is not None else f[ic]
             N_ppt, k_ppt, maxmins_ppt, diffMaxmins_ppt = \
-                find_max_frequency(f[ic],tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
+                find_max_frequency(f_pp,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
             if k_ppt<k_pp:
                 N_pp, k_pp, maxmins_pp, diffMaxmins_pp = N_ppt, k_ppt, maxmins_ppt, diffMaxmins_ppt   
                 del N_ppt, k_ppt, maxmins_ppt, diffMaxmins_ppt
@@ -260,8 +260,9 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
         if opts.MaskLengthType == 'amp': 
             k_pp=N
             for ic in range(D):
+                f_pp = np.delete(f[ic],data_mask) if data_mask is not None else f[ic]
                 N_ppt, k_ppt, maxmins_ppt, diffMaxmins_ppt = \
-                    find_max_frequency(f[ic],tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
+                    find_max_frequency(f_pp,tol=tol, mode = opts.BCmode, method = opts.Maxmins_method)
                 if k_ppt<k_pp:
                     N_pp, k_pp, maxmins_pp, diffMaxmins_pp = N_ppt, k_ppt, maxmins_ppt, diffMaxmins_ppt   
                 del N_ppt, k_ppt, maxmins_ppt, diffMaxmins_ppt
