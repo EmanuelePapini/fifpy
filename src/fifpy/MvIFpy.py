@@ -157,7 +157,7 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
     if opts.MaskLengthType == 'amp': 
         if not silent: print('using amplitude to calculate mask')
         tol = 1e-18
-    MaxlogM = np.size(f) if opts.MaxlogM is None else opts.MaxlogM    
+    MaxlogM = np.size(in_f) if opts.MaxlogM is None else opts.MaxlogM    
     #loading master filter
     ift = opts.timeit
     if ift: 

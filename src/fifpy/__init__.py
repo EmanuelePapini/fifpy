@@ -210,7 +210,7 @@ class FIF():
         if self.data['IMC'].shape[0] <3: #if shape==2 then only one imf was extracted
             return
         IMCs = self.data['IMC']
-        imfs = ftools.orthogonalize(IMCs,threshold, only_nearest, **kwargs)
+        imfs = ftools.orthogonalize(IMCs,threshold, **kwargs)
         self.ancillary['orthogonalized'] = True
         self.data['IMC'] = imfs
 
