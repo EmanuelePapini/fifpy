@@ -12,7 +12,7 @@
 
 
 from .IF_aux import *
-__version__='8.4'
+__version__='8.4.1'
 
 ################################################################################
 ###################### Mv Iterative Filtering main functions ###################
@@ -136,8 +136,8 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
     opts = AttrDictSens(options)
     silent = opts.silent
     if nthreads is not None:
-        if opts.imf_method == 'numba': 
-            set_num_threads(nthreads)
+        #if opts.imf_method == 'numba': 
+        set_num_threads(nthreads)
     if opts.verbose:
         print('running IF decomposition...')
         #if verbose:
@@ -150,6 +150,11 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
     if opts.imf_method == 'fft': 
         compute_imf = compute_imf_fft
         #compute_imf = compute_imf_fft_adv
+    elif opts.imf_method == 'fft_adv': 
+        compute_imf = compute_imf_fft_adv
+        #compute_imf = compute_imf_fft_adv
+    elif opts.imf_method == 'fft_numba': 
+        compute_imf = compute_imf_fft_numba
     elif opts.imf_method == 'numba': 
         compute_imf = compute_imf_numba
 

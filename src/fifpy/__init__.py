@@ -285,6 +285,7 @@ class MvFIF(FIF):
         Return the extracted IMCs (excluding the extension)
         """
         return self.data['IMC'][:,:,self.wsh:-self.wsh] if self.wsh >0 else self.data['IMC'] 
+    
 
     def get_freq_amplitudes(self, as_output = False, use_instantaneous_freq = True,  **kwargs):
         """
@@ -317,12 +318,49 @@ class MvFIF(FIF):
                      **kwargs)
             freqs[i] = freqt
             amps[i] = ampt
-        self.data['freqs'] = freqs 
-        self.data['amps'] = amps
+        self.data['freqs'] = freqs#.transpose(1,0,2) 
+        self.data['amps'] = amps#.transpose(1,0,2)
         self.ancillary['get_freq_amplitudes'] = kwargs
         self.ancillary['get_freq_amplitudes']['use_instantaneous_freq'] = use_instantaneous_freq
         
         if as_output: return self.data['freqs'], self.data['amps']
+
+    def get_instantaneous_freq_amplitude(self, dt,as_output = False,**kwargs):
+        """
+        Calculates the instantaneous frequencies and amplitudes of the IMCs.
+        
+        Parameters
+        ----------
+        as_output : bool
+            if set to True, then it returns inst. frequency and amplitude.
+            If set to false, save the result in self.data['freqs'] and self.data['amps'].   
+        
+        the available **kwargs are the following kwargs from self.fif_tools.IMC_get_freq_amplitudes
+            dt : float (default = 1.)
+                time resolution (inverse of the sampling frequency)
+            resort : Bool (default = False)
+                if true, frequencies and amplitudes are sorted frequency-wise
+        """
+        wsh = self.ancillary['wshrink']
+        
+        nimf,ndim,nt = self.data['IMC'].shape
+        freqs = np.zeros((ndim,nimf,nt))
+        amps = np.zeros((ndim,nimf,nt))
+        for i in range(ndim):
+            freqt,ampt = ftools.IMC_get_inst_freq_amp(self.data['IMC'][:,i,:], dt=dt)
+            freqs[i] = freqt[...]
+            amps[i] = ampt[...]
+
+        self.data['I_freqs'] = freqs.transpose(1,0,2) 
+        self.data['I_amps'] = amps.transpose(1,0,2)
+        
+        setattr(self.__class__, 'I_freqs', _make_shrink_property('I_freqs'))
+        setattr(self.__class__, 'I_amps',  _make_shrink_property('I_amps')) 
+        #self.I_freqs = _make_shrink_property('I_freqs')
+        #self.I_amps = _make_shrink_property('I_amps')
+        if as_output: return self.data['freqs'], self.data['amps']
+
+    #I_freq2 = _make_shrink_property('I_freqs')
 
     def orthogonalize(self,threshold = 0.6, only_nearest = True, **kwargs):
         """
@@ -505,7 +543,7 @@ class MvIF(MvFIF):
             if not silent: print('\nmaking input signal periodic...')
             from .arrays import make_periodic
             
-            if wshrink == 0 : wshrink = in_f.size//4 
+            if wshrink == 0 : wshrink = in_f.shape[-1]//4 
             
             out_f = np.zeros((D,N)) 
             for iD in range(D):    
@@ -677,3 +715,11 @@ class MIF():
         imfs = ftools.orthogonalize(IMCs,threshold, only_nearest, **kwargs)
         self.ancillary['orthogonalized'] = True
         self.data['IMC'] = imfs
+
+
+def _make_shrink_property(key):
+    @property
+    def prop(self):
+        d = self.data[key]
+        return d[:, :, self.wsh:-self.wsh] if self.wsh > 0 else d
+    return prop
