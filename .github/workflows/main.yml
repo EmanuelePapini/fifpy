@@ -1,4 +1,4 @@
-name: Build Python Wheel
+name: Build Python Wheel and Publish to PyPI
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
       - 'v*.*.*'   # triggers on tags like v1.0.0, v2.3.1, etc.
 
 jobs:
-  build:
-    name: Build wheel
+  build-and-publish:
+    name: Build wheel and publish to PyPI
     runs-on: ubuntu-latest
 
     steps:
@@ -26,7 +26,13 @@ jobs:
       - name: Build wheel
         run: python -m build --wheel
 
-      - name: Upload wheel artifact
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}
+
+      - name: Upload wheel artifact (backup)
         uses: actions/upload-artifact@v4
         with:
           name: python-wheel
