@@ -2,7 +2,7 @@ name: Build Python Wheel
 
 on:
   push:
-    branches: [ "pythonpackage_only" ]
+    branches: [ "master" ]
     tags:
       - 'v*.*.*'   # triggers on tags like v1.0.0, v2.3.1, etc.
 
