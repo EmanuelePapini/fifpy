@@ -16,7 +16,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iterativefiltering"
-version = "1.0.3"
+version = "1.0.4"
 description = "Python Package for Iterative Filtering decomposition methods"
 readme = "README.md"
 requires-python = "<3.13"

@@ -84,6 +84,7 @@ def Settings(**kwargs):
     options['imf_method'] = 'fft_adv' #fft #numba #select the numerical method for computation
     options['MaxlogM'] = None # Maximum allowed mask length (If None then this value is
                               # automatically set to the length of the timeseries.
+    options['silent'] = False
     for i in kwargs:
         if i in options.keys() : options[i] = kwargs[i] 
     return AttrDictSens(options)
