@@ -506,7 +506,7 @@ class MvIF(MvFIF):
 
 
     def run(self, in_f, M=np.array([]), wshrink = 0, preprocess = None, get_output = False,\
-            data_mask = None, npad_raisedcos = None):
+            data_mask = None, npad_raisedcos = None,**kwargs):
         """
         Parameters
         ----------
@@ -568,7 +568,7 @@ class MvIF(MvFIF):
             if preprocess is not None: Warning('wrong input in keyword argument preprocess. Falling back to None')
             out_f = in_f
 
-        MvFIF.run(self,out_f, M=M, wshrink= wshrink, data_mask = data_mask)
+        MvFIF.run(self,out_f, M=M, wshrink= wshrink, data_mask = data_mask,**kwargs)
 
         if get_output == True:
             return self.data['IMC'][:,wshrink:-wshrink]

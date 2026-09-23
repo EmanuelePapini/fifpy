@@ -136,6 +136,8 @@ def MvIF(in_f,options,M=np.array([]), window_mask=None, data_mask = None, nthrea
     opts = AttrDictSens(options)
     silent = opts.silent
     if nthreads is not None:
+        if not silent:
+            print('setting nthreads to '+str(nthreads))
         #if opts.imf_method == 'numba': 
         set_num_threads(nthreads)
     if opts.verbose:
